@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>포켓몬 불가사의 던전 - 리얼타임 클래스 에디션</title>
+  <title>생명과학 복습</title>
   <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
     :root {
@@ -141,7 +141,7 @@
 <div id="app">
   <!-- 상단바 -->
   <div class="top-nav">
-    <div><span id="sync-indicator" class="sync-dot"></span><span id="nav-title">포켓몬 불가사의 던전 DX</span></div>
+    <div><span id="sync-indicator" class="sync-dot"></span><span id="nav-title">생명과학 복습</span></div>
     <div style="display:flex; gap:5px;">
       <button id="btn-dex" class="btn btn-gold" style="padding:4px 8px; font-size:11px; display:none;" onclick="openPokedex()">📖 도감</button>
       <button class="btn btn-gray" style="padding:4px 8px; font-size:11px;" onclick="openPwModal()">🔒 교사 설정</button>
@@ -151,7 +151,7 @@
   <!-- 1. 학생 로그인 화면 -->
   <div id="screen-login" class="screen active" style="justify-content:center;">
     <div class="pmd-box">
-      <h2 style="color:var(--gold); text-align:center; margin-bottom:6px;">탐험대 학번 로그인</h2>
+      <h2 style="color:var(--gold); text-align:center; margin-bottom:6px;">로그인</h2>
       <p style="font-size:11px; color:#b8d0e8; text-align:center; margin-bottom:14px;">학번과 비밀번호로 접속하면 진도율, 파트너 진화, 340종 도감이 기록됩니다.</p>
       <label style="font-size:11px; font-weight:bold;">학번 (예: 10101)</label>
       <input type="text" id="login-id" class="input-field" placeholder="학번 입력 (예: 10101)">
@@ -294,11 +294,12 @@
       <div class="pmd-box">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <select id="t-class-sel" class="input-field" style="width:auto; margin:0; padding:4px 6px;" onchange="loadProgress()"></select>
+          <button class="btn btn-gold" style="padding:3px 8px; font-size:10px;" onclick="showClassAnalysis()">📉 반 오답 분석</button>
           <button class="btn btn-gold" style="padding:3px 8px; font-size:10px;" onclick="exportStudentCSV()">📥 엑셀(CSV) 저장</button>
         </div>
         <table>
           <thead>
-            <tr><th>학번</th><th>이름</th><th>현재 상태</th><th>클리어 단원</th><th>정답률</th><th>도감</th><th>관리</th></tr>
+            <tr><th>학번</th><th>이름</th><th>현재 상태</th><th>클리어 단원</th><th>정답률</th><th>도감</th><th>오답</th><th>관리</th></tr>
           </thead>
           <tbody id="t-progress-tbody"></tbody>
         </table>
@@ -315,8 +316,14 @@
         <select id="t-unit-sel" class="input-field" onchange="loadUnitToUI()"></select>
         <label style="font-size:11px; font-weight:bold;">단원명</label>
         <input type="text" id="t-unit-title" class="input-field">
-        <label style="font-size:11px; font-weight:bold;">던전 맵 테마 (20종 고유 그래픽 & 전설 보스)</label>
+        <label style="font-size:11px; font-weight:bold;">기본 던전 (학년별로 따로 고르지 않으면 이 던전이 나옵니다)</label>
         <select id="t-biome-sel" class="input-field"></select>
+        <label style="font-size:11px; font-weight:bold;">학년별 설정 (체크한 학년에게만 이 단원이 보이고, 던전은 학년마다 다르게 고를 수 있어요)</label>
+        <div style="margin:4px 0 8px;">
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:5px;"><label style="width:74px; font-size:12px; flex:none;"><input type="checkbox" id="t-g1" checked> 1학년</label><select id="t-gb1" class="input-field" style="margin:0;"></select></div>
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:5px;"><label style="width:74px; font-size:12px; flex:none;"><input type="checkbox" id="t-g2" checked> 2학년</label><select id="t-gb2" class="input-field" style="margin:0;"></select></div>
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:5px;"><label style="width:74px; font-size:12px; flex:none;"><input type="checkbox" id="t-g3" checked> 3학년</label><select id="t-gb3" class="input-field" style="margin:0;"></select></div>
+        </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin:8px 0 6px;">
           <span style="font-size:12px; font-weight:900; color:var(--gold);">출제 문항 리스트 (첫 번째 칸에 정답 입력)</span>
@@ -325,6 +332,7 @@
         <div id="t-q-list"></div>
         <div style="display:flex; gap:6px; margin-top:10px;">
           <button class="btn btn-red" style="flex:1;" onclick="deleteUnit()">단원 삭제</button>
+          <button class="btn" style="flex:1;" onclick="duplicateUnit()">단원 복제</button>
           <button class="btn btn-gold" style="flex:2;" onclick="saveUnitUI()">💾 저장 및 전교생 실시간 배포</button>
         </div>
       </div>
@@ -342,6 +350,16 @@
   </div>
 
   <!-- 교사 비밀번호 입력 전용 모달 (* 마스킹 처리) -->
+  <div id="detail-modal" class="modal-overlay" style="overflow-y:auto; justify-content:flex-start;">
+    <div class="pmd-box" style="width:100%;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px;">
+        <h3 id="detail-title" style="color:var(--gold); font-size:14px;"></h3>
+        <button class="btn btn-gray" style="padding:4px 9px;" onclick="document.getElementById('detail-modal').style.display='none'">닫기</button>
+      </div>
+      <div id="detail-body"></div>
+    </div>
+  </div>
+
   <div id="pw-modal" class="modal-overlay">
     <div class="pmd-box" style="max-width:340px; margin:0 auto; width:100%;">
       <h3 style="color:var(--gold); text-align:center; margin-bottom:8px;">🔒 교사 관리자 인증</h3>
@@ -545,8 +563,21 @@ async function hashPw(id, pw) {
     return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
   } catch (e) { let h = 5381; for (const ch of s) h = ((h << 5) + h + ch.charCodeAt(0)) | 0; return "x" + h; }
 }
+const gradeOf = id => { const g = parseInt(String(id)[0], 10); return g >= 1 && g <= 3 ? g : 0; };
+const unitsFor = id => unitsData.filter(u => !Array.isArray(u.grades) || !u.grades.length || !gradeOf(id) || u.grades.includes(gradeOf(id)));
+const unitBiomeId = u => { const g = currentStudent ? gradeOf(currentStudent.id) : 0; return (u.gradeBiomes && u.gradeBiomes['g' + g]) || u.biomeId; };
+const hash36 = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) | 0; return (h >>> 0).toString(36); };
+function recordAnswer(ok, sel) {
+  if (!currentStudent || !curQ) return;
+  const st = currentStudent.qstat = currentStudent.qstat || {};
+  const k = curUnit.unitId + "_" + hash36(curQ.q);
+  const r = st[k] = st[k] || { u: curUnit.unitId, q: String(curQ.q).slice(0, 120), a: String(curQ.a).slice(0, 60), ok: 0, ng: 0 };
+  if (ok) r.ok++; else { r.ng++; r.w = String(sel).slice(0, 60); }
+  r.ts = Date.now();
+  pushStudentToCloud();
+}
 const summaryOf = s => ({ id:s.id, name:s.name, status:s.status || "", cleared:(s.clearedUnits || []).length,
-  correct:s.correct || 0, total:s.total || 0, dex:(s.unlockedDex || []).length, ts:Date.now() });
+  correct:s.correct || 0, total:s.total || 0, dex:(s.unlockedDex || []).length, wq:Object.values(s.qstat || {}).filter(x => x.ng > 0).length, ts:Date.now() });
 const saveLocalDB = () => localStorage.setItem("PMD_STUDENTS_V3", JSON.stringify(studentsDB));
 
 async function syncFromCloud() { // 단원 문제만 동기화
@@ -593,6 +624,7 @@ setInterval(() => { if (currentStudent && document.getElementById('screen-lobby'
  * 3. 학생 로그인 & 로비 & 도감 (341종 실루엣)
  * ========================================================================= */
 function showScreen(id) {
+  if (id !== 'screen-game') document.getElementById('nav-title').innerText = "생명과학 복습";
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
@@ -646,8 +678,10 @@ function logoutStudent() {
 
 function renderLobby() {
   if (!currentStudent) return;
-  const cleared = currentStudent.clearedUnits.length;
-  const totalU = unitsData.length;
+  const myUnits = unitsFor(currentStudent.id);
+  if (!myUnits.includes(curUnit)) curUnit = myUnits[0] || curUnit;
+  const cleared = myUnits.filter(u => currentStudent.clearedUnits.includes(u.unitId)).length;
+  const totalU = myUnits.length;
   const pct = totalU > 0 ? Math.round((cleared / totalU) * 100) : 0;
 
   document.getElementById('st-info').innerText = `[${currentStudent.id}] ${currentStudent.name} 대원`;
@@ -657,8 +691,8 @@ function renderLobby() {
   wrap.innerHTML = "";
   const tKor = { water:"물 💧", fire:"불꽃 🔥", grass:"풀 🌿" };
 
-  unitsData.forEach(u => {
-    const b = getBiome(u.biomeId);
+  myUnits.forEach(u => {
+    const b = getBiome(unitBiomeId(u));
     const isClear = currentStudent.clearedUnits.includes(u.unitId);
     const card = document.createElement('div');
     card.className = `pmd-box unit-card ${u.unitId === curUnit.unitId ? 'selected' : ''}`;
@@ -675,7 +709,8 @@ function renderLobby() {
 }
 
 function goStarterScreen() {
-  const b = getBiome(curUnit.biomeId);
+  if (!unitsFor(currentStudent.id).includes(curUnit)) { alert("우리 학년에 배정된 단원이 아직 없습니다."); return; }
+  const b = getBiome(unitBiomeId(curUnit));
   const tKor = { water:"물 💧", fire:"불꽃 🔥", grass:"풀 🌿" };
   document.getElementById('rec-badge').innerText = `추천: ${tKor[b.rec]}`;
   const rec = STARTERS.find(s => s.gen === curGen && s.type === b.rec);
@@ -698,7 +733,7 @@ function renderGenTabs() {
 }
 
 function renderStarterGrid() {
-  const b = getBiome(curUnit.biomeId);
+  const b = getBiome(unitBiomeId(curUnit));
   const g = document.getElementById('starter-grid');
   g.innerHTML = "";
   STARTERS.filter(s => s.gen === curGen).forEach(p => {
@@ -834,7 +869,7 @@ const adj=(e,p)=>Math.max(Math.abs(e.x-p.x),Math.abs(e.y-p.y))===1&&canStep(e.x,
 
 /* ---- 던전 생성: 4x3 그리드 셀마다 방/교차점 → 신장트리 + 순환 복도 ---- */
 function generateFloor(){
-  const b=getBiome(curUnit.biomeId);
+  const b=getBiome(unitBiomeId(curUnit));
   const grid=()=>Array.from({length:MH},()=>Array(MW).fill(false));
   map=Array.from({length:MH},()=>Array(MW).fill(T_WALL));
   roomId=Array.from({length:MH},()=>Array(MW).fill(-1));
@@ -987,7 +1022,7 @@ function startDungeon() {
   player.belly = 100; player.berries = 2;
   player.evoStage = 0; player.quizSolved = 0; player.allies = [];
   if (currentStudent && !currentStudent.unlockedDex.includes(curStarter.id)) currentStudent.unlockedDex.push(curStarter.id);
-  const b = getBiome(curUnit.biomeId);
+  const b = getBiome(unitBiomeId(curUnit));
   [0,1,2].forEach(i=>{ getPmd(curStarter.id+i); getPokeImg(curStarter.id+i); });
   b.pokes.forEach(pid => { getPmd(pid); getPokeImg(pid); fetchKorName(pid); });
   getPmd(b.boss.id); getPokeImg(b.boss.id);
@@ -1113,7 +1148,7 @@ function openBattleModal(enemy) {
 }
 
 function refreshBattleHUD() {
-  const b = getBiome(curUnit.biomeId);
+  const b = getBiome(unitBiomeId(curUnit));
   document.getElementById('b-p-img').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${getPlayerPokeId()}.png`;
   document.getElementById('b-p-name').innerText = `${getPlayerPokeName()} (Lv.${player.lv})`;
   document.getElementById('b-p-hp-txt').innerText = `HP ${player.hp}/${player.maxHp}`;
@@ -1130,9 +1165,11 @@ function refreshBattleHUD() {
   adv.style.background = isAdv ? "#f8d030" : "#5890f0";
 }
 
+let curQ = null;
 function nextQuiz() {
   const qs = curUnit.questions;
   const qItem = qs[Math.floor(Math.random() * qs.length)];
+  curQ = qItem;
   document.getElementById('q-text').innerText = `Q. ${qItem.q}`;
 
   const wrap = document.getElementById('q-options');
@@ -1148,7 +1185,8 @@ function nextQuiz() {
 
 function resolveQuiz(selected, correct) {
   if (currentStudent) currentStudent.total++;
-  const b = getBiome(curUnit.biomeId);
+  recordAnswer(selected === correct, selected);
+  const b = getBiome(unitBiomeId(curUnit));
   const isAdv = curStarter.type === b.rec;
   const sk = SKILLS[curStarter.type] || SKILLS.water;
 
@@ -1295,7 +1333,7 @@ function drawDungeon(time){
     ctx.drawImage(mapCv,x*TS,y*TS,TS,TS,x*TS,y*TS,TS,TS);
     if(!visible[y][x]){ ctx.fillStyle="rgba(4,8,18,.58)"; ctx.fillRect(x*TS,y*TS,TS,TS); }
   }
-  const acc=getBiome(curUnit.biomeId).pal.acc;
+  const acc=getBiome(unitBiomeId(curUnit)).pal.acc;
   sparks.forEach(sp=>{ if(!visible[sp.y][sp.x]) return;
     const a=Math.max(0,Math.sin(time/350+sp.ph)); if(a<.15) return;
     const X=sp.x*TS+sp.dx, Y=sp.y*TS+sp.dy; ctx.globalAlpha=a; ctx.fillStyle=acc;
@@ -1384,6 +1422,12 @@ function initTeacherScreen() {
     o.value = b.id; o.innerText = `${b.name} (보스: ${b.boss.name})`;
     bSel.appendChild(o);
   });
+  [1, 2, 3].forEach(g => {
+    const s = document.getElementById('t-gb' + g);
+    if (s.options.length) return;
+    s.add(new Option("기본 던전과 같음", ""));
+    BIOMES.forEach(b => s.add(new Option(b.name, b.id)));
+  });
   refreshUnitDropdown(0);
   loadProgress();
 }
@@ -1406,22 +1450,70 @@ function renderProgressTable() {
   const tb = document.getElementById('t-progress-tbody');
   tb.innerHTML = "";
   const arr = [...progressRows].sort((a, b) => String(a.id).localeCompare(String(b.id)));
-  if (!arr.length) { tb.innerHTML = `<tr><td colspan="7">학생 기록이 없습니다.</td></tr>`; return; }
+  if (!arr.length) { tb.innerHTML = `<tr><td colspan="8">학생 기록이 없습니다.</td></tr>`; return; }
   arr.forEach(s => {
     const acc = s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0, id = esc(s.id);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><b>${id}</b></td><td>${esc(s.name)}</td>
       <td style="color:#68e868;">${esc(s.status || '대기')}</td>
-      <td>${s.cleared || 0}/${unitsData.length}</td>
+      <td>${s.cleared || 0}/${unitsFor(s.id).length}</td>
       <td>${acc}% (${s.correct || 0}/${s.total || 0})</td>
       <td>${s.dex || 0}종</td>
+      <td><button class="btn" style="padding:2px 6px; font-size:9px;" onclick="showStudentDetail('${id}')">${s.wq || 0}문항 ▸</button></td>
       <td><button class="btn btn-gray" style="padding:2px 5px; font-size:9px;" onclick="resetStudentPw('${id}')">비번초기화</button>
           <button class="btn btn-red" style="padding:2px 5px; font-size:9px; margin-top:2px;" onclick="deleteStudent('${id}')">삭제</button></td>`;
     tb.appendChild(tr);
   });
 }
 const nextGen = async id => String(+((await fb("/gen/" + id + ".json")) || "0") + 1);
+/* ---- 오답 상세 / 반 오답 분석 ---- */
+const qList = rec => Object.values((rec && rec.qstat) || {});
+const unitName = uid => { const u = unitsData.find(x => x.unitId === uid); return u ? u.unitTitle.replace(/^\d+단원:\s*/, "") : uid; };
+const tbl = (head, rows) => `<div style="overflow-x:auto;"><table><thead><tr>${head.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+const L = 'style="text-align:left;"';
+function openDetail(title) {
+  document.getElementById('detail-title').innerText = title;
+  document.getElementById('detail-body').innerHTML = '<div style="font-size:12px;">불러오는 중…</div>';
+  document.getElementById('detail-modal').style.display = 'flex';
+}
+async function showStudentDetail(id) {
+  openDetail(`[${id}] 문제별 기록`);
+  const body = document.getElementById('detail-body');
+  let rec;
+  try { rec = useCloud() ? await fb("/students/" + id + ".json") : studentsDB[id]; }
+  catch (e) { body.innerText = "불러오지 못했습니다. 인터넷 연결을 확인해 주세요."; return; }
+  const all = qList(rec), wrong = all.filter(r => r.ng > 0).sort((a, b) => b.ng - a.ng || (b.ts || 0) - (a.ts || 0));
+  if (!all.length) { body.innerHTML = '<div style="font-size:12px;">아직 문제를 푼 기록이 없습니다. (이 기능을 켠 이후의 기록부터 쌓입니다)</div>'; return; }
+  const ok = all.reduce((s, r) => s + r.ok, 0), ng = all.reduce((s, r) => s + r.ng, 0);
+  document.getElementById('detail-title').innerText = `[${id}] ${rec.name || ""} · 정답 ${ok} / 오답 ${ng} (${Math.round(ok * 100 / (ok + ng))}%)`;
+  body.innerHTML = wrong.length ? tbl(["단원", "문제", "정답", "최근 고른 오답", "틀림", "맞음"],
+    wrong.map(r => `<tr><td ${L}>${esc(unitName(r.u))}</td><td ${L}>${esc(r.q)}</td><td>${esc(r.a)}</td><td style="color:#f88;">${esc(r.w || "")}</td><td><b>${r.ng}</b></td><td>${r.ok}</td></tr>`))
+    : '<div style="font-size:12px;">틀린 문제가 없습니다. 👏</div>';
+}
+async function showClassAnalysis() {
+  const pre = classPrefix();
+  if (!pre) { alert("위 목록에서 학년·반을 먼저 선택해 주세요."); return; }
+  openDetail("반 오답 분석 (많이 틀린 문제 순)");
+  const body = document.getElementById('detail-body');
+  let recs;
+  try {
+    if (useCloud()) {
+      const q = `?orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent('"' + pre + '00"')}&endAt=${encodeURIComponent('"' + pre + '99"')}`;
+      recs = Object.values(await fb("/students.json" + q) || {});
+    } else recs = Object.values(studentsDB).filter(r => String(r.id).startsWith(pre));
+  } catch (e) { body.innerText = "불러오지 못했습니다. 인터넷 연결을 확인해 주세요."; return; }
+  const agg = {};
+  recs.forEach(r => qList(r).forEach(x => {
+    const g = agg[x.u + "|" + x.q] = agg[x.u + "|" + x.q] || { u: x.u, q: x.q, a: x.a, ok: 0, ng: 0, miss: 0, tried: 0 };
+    g.ok += x.ok; g.ng += x.ng; g.tried++; if (x.ng > 0) g.miss++;
+  }));
+  const rows = Object.values(agg).filter(g => g.ng > 0).sort((a, b) => b.ng / (b.ok + b.ng) - a.ng / (a.ok + a.ng) || b.ng - a.ng).slice(0, 15);
+  document.getElementById('detail-title').innerText = `${pre.slice(0, 1)}학년 ${+pre.slice(1)}반 오답 분석 (${recs.length}명 기록)`;
+  body.innerHTML = rows.length ? tbl(["단원", "문제", "정답", "오답률", "틀린 학생"],
+    rows.map(g => `<tr><td ${L}>${esc(unitName(g.u))}</td><td ${L}>${esc(g.q)}</td><td>${esc(g.a)}</td><td><b>${Math.round(g.ng * 100 / (g.ok + g.ng))}%</b></td><td>${g.miss}/${g.tried}명</td></tr>`))
+    : '<div style="font-size:12px;">아직 분석할 오답 기록이 없습니다.</div>';
+}
 async function deleteStudent(id) {
   if (!confirm(`[${id}] 계정을 삭제할까요?\n진도·도감 기록이 모두 사라지며 되돌릴 수 없습니다.\n(같은 학번으로 새로 시작할 수 있습니다)`)) return;
   try {
@@ -1440,9 +1532,9 @@ async function resetStudentPw(id) {
 }
 
 function exportStudentCSV() {
-  let csv = "\uFEFF학번,이름,현재상태,클리어단원수,정답수,시도수,도감수집수\n";
+  let csv = "\uFEFF학번,이름,현재상태,클리어단원수,정답수,시도수,도감수집수,오답문항수\n";
   [...progressRows].sort((a, b) => String(a.id).localeCompare(String(b.id))).forEach(s => {
-    csv += `${s.id},"${String(s.name).replace(/"/g, '""')}",${s.status || ''},${s.cleared || 0},${s.correct || 0},${s.total || 0},${s.dex || 0}\n`;
+    csv += `${s.id},"${String(s.name).replace(/"/g, '""')}",${s.status || ''},${s.cleared || 0},${s.correct || 0},${s.total || 0},${s.dex || 0},${s.wq || 0}\n`;
   });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
@@ -1454,7 +1546,7 @@ function refreshUnitDropdown(idx = 0) {
   uSel.innerHTML = "";
   unitsData.forEach((u, i) => {
     const o = document.createElement('option');
-    o.value = i; o.innerText = u.unitTitle;
+    o.value = i; o.innerText = u.unitTitle + (Array.isArray(u.grades) && u.grades.length && u.grades.length < 3 ? ` [${u.grades.join('·')}학년]` : '');
     uSel.appendChild(o);
   });
   uSel.selectedIndex = idx;
@@ -1466,6 +1558,7 @@ function loadUnitToUI() {
   if (!u) return;
   document.getElementById('t-unit-title').value = u.unitTitle;
   document.getElementById('t-biome-sel').value = u.biomeId;
+  [1, 2, 3].forEach(g => { document.getElementById('t-gb' + g).value = (u.gradeBiomes && u.gradeBiomes['g' + g]) || ""; document.getElementById('t-g' + g).checked = !Array.isArray(u.grades) || !u.grades.length || u.grades.includes(g); });
   const list = document.getElementById('t-q-list');
   list.innerHTML = "";
   u.questions.forEach(q => addQRow(q.q, q.options));
@@ -1501,6 +1594,26 @@ function addNewUnit() {
   refreshUnitDropdown(unitsData.length - 1);
 }
 
+function duplicateUnit() { // 지금 화면에 보이는 내용(저장 전 수정 포함)을 그대로 복사
+  const idx = +document.getElementById('t-unit-sel').value, src = unitsData[idx];
+  if (!src) return;
+  const qs = [];
+  document.querySelectorAll('#t-q-list .q-row').forEach(r => {
+    const q = r.querySelector('.q-in').value.trim(), o0 = r.querySelector('.o0').value.trim();
+    if (q && o0) qs.push({ q, a: o0, options: [o0, r.querySelector('.o1').value.trim() || "오답A", r.querySelector('.o2').value.trim() || "오답B", r.querySelector('.o3').value.trim() || "오답C"] });
+  });
+  const gs = [1, 2, 3].filter(g => document.getElementById('t-g' + g).checked);
+  unitsData.splice(idx + 1, 0, {
+    unitId: "u_" + Date.now(),
+    unitTitle: (document.getElementById('t-unit-title').value.trim() || src.unitTitle) + " (복사)",
+    biomeId: document.getElementById('t-biome-sel').value,
+    grades: gs.length ? gs : [1, 2, 3],
+    gradeBiomes: Object.fromEntries(gs.map(g => ['g' + g, document.getElementById('t-gb' + g).value]).filter(e => e[1])),
+    questions: qs.length ? qs : JSON.parse(JSON.stringify(src.questions))
+  });
+  refreshUnitDropdown(idx + 1);
+  alert("복사했습니다! 단원명·던전·학년을 바꾼 뒤 [저장 및 전교생 실시간 배포]를 눌러야 학생에게 반영됩니다.");
+}
 async function deleteUnit() {
   if (unitsData.length <= 1) { alert("최소 1개 단원은 유지해야 합니다."); return; }
   const idx = document.getElementById('t-unit-sel').value;
@@ -1515,6 +1628,11 @@ async function deleteUnit() {
 async function saveUnitUI() {
   const idx = document.getElementById('t-unit-sel').value;
   const u = unitsData[idx];
+  const gs = [1, 2, 3].filter(g => document.getElementById('t-g' + g).checked);
+  if (!gs.length) { alert("최소 한 학년은 선택해 주세요."); return; }
+  u.grades = gs;
+  u.gradeBiomes = {};
+  gs.forEach(g => { const v = document.getElementById('t-gb' + g).value; if (v) u.gradeBiomes['g' + g] = v; });
   u.unitTitle = document.getElementById('t-unit-title').value.trim() || "단원";
   u.biomeId = document.getElementById('t-biome-sel').value;
 

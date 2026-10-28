@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>포켓몬 불가사의 던전 - 리얼타임 클래스 에디션</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    :root {
+      --pmd-win: rgba(16, 32, 54, 0.96);
+      --pmd-border: #dceeff;
+      --pmd-inner: #3a75b0;
+      --gold: #f8d030;
+      --grass: #68c850; --fire: #f07830; --water: #5890f0;
+    }
+    * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
+    body { background: #06080e; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+
+    #app {
+      width: 100%; max-width: 600px; height: 100vh; max-height: 940px;
+      background: #0d131f; display: flex; flex-direction: column; position: relative;
+      border: 3px solid #2b3e5e; box-shadow: 0 0 50px rgba(0,0,0,0.95);
+    }
+
+    .pmd-box {
+      background: var(--pmd-win);
+      border: 3px solid var(--pmd-border);
+      box-shadow: inset 0 0 0 2px var(--pmd-inner), 0 4px 12px rgba(0,0,0,0.7);
+      border-radius: 8px; padding: 12px;
+    }
+
+    .top-nav {
+      height: 48px; background: #101d30; border-bottom: 2px solid var(--pmd-inner);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-weight: 900; font-size: 13px;
+    }
+    .sync-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #888; margin-right: 5px; }
+    .sync-dot.online { background: #48e058; box-shadow: 0 0 6px #48e058; }
+
+    .screen { display: none; flex: 1; flex-direction: column; padding: 12px; overflow-y: auto; position: relative; }
+    .screen.active { display: flex; }
+
+    .btn {
+      background: linear-gradient(180deg, #3880c8 0%, #1c528a 100%);
+      border: 2px solid var(--pmd-border); color: #fff; padding: 9px 13px; border-radius: 6px;
+      font-weight: 800; font-size: 12px; cursor: pointer; text-align: center;
+      box-shadow: 0 3px 0 #0d2744; transition: 0.1s;
+    }
+    .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #0d2744; }
+    .btn-gold { background: linear-gradient(180deg, #f8d030 0%, #c89810 100%); color: #000; border-color: #fff; }
+    .btn-gray { background: #324458; }
+    .btn-red { background: #c83838; }
+
+    .input-field {
+      width: 100%; padding: 9px 10px; border-radius: 6px; border: 2px solid #4888b8;
+      background: #0b1522; color: #fff; font-size: 13px; margin-bottom: 8px; user-select: text;
+    }
+
+    .badge { padding: 3px 7px; border-radius: 4px; font-size: 10px; font-weight: 900; display: inline-block; }
+    .badge-grass { background: var(--grass); color: #000; }
+    .badge-fire { background: var(--fire); color: #fff; }
+    .badge-water { background: var(--water); color: #fff; }
+    .badge-best { background: var(--gold); color: #000; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+
+    .unit-card { margin-bottom: 8px; cursor: pointer; transition: 0.15s; }
+    .unit-card.selected { border-color: var(--gold); background: rgba(42, 82, 126, 0.96); }
+    .gen-tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; }
+    .gen-tab { padding: 5px 10px; background: #182838; border: 1px solid #4888b8; border-radius: 4px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+    .gen-tab.active { background: var(--gold); color: #000; font-weight: 900; }
+    .starter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .starter-card { text-align: center; cursor: pointer; position: relative; padding: 8px; }
+    .starter-card.selected { border-color: var(--gold); background: rgba(56, 100, 144, 0.9); }
+    .starter-card img { width: 64px; height: 64px; image-rendering: pixelated; }
+
+    /* 도감 실루엣 그리드 (던전당 13마리) */
+    .dex-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 8px; }
+    .dex-slot { background: #0e1c2c; border: 1px solid #355880; border-radius: 6px; padding: 4px; text-align: center; position: relative; }
+    .dex-slot img { width: 50px; height: 50px; image-rendering: pixelated; }
+    .dex-slot.locked img { filter: brightness(0) drop-shadow(0 0 2px rgba(120,180,255,0.35)); opacity: 0.75; }
+    .dex-boss { border: 2px solid var(--gold); background: rgba(65, 48, 12, 0.5); }
+
+    /* 인게임 던전 뷰포트 */
+    #screen-game { padding: 0; overflow: hidden; background: #000; }
+    .dungeon-hud {
+      position: absolute; top: 6px; left: 6px; right: 6px; z-index: 10;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 10px; font-size: 12px; font-weight: 800; pointer-events: none;
+    }
+    .hp-wrap { width: 88px; height: 11px; background: #222; border: 2px solid #fff; border-radius: 6px; overflow: hidden; }
+    .hp-fill { height: 100%; background: #48e058; transition: width 0.25s; }
+
+    #viewport { position: relative; flex: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+    #dungeonCanvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+    .d-btn { touch-action: none; }
+    #minimapCanvas {
+      position: absolute; top: 52px; right: 8px; width: 104px; height: 104px;
+      background: rgba(0, 8, 18, 0.72); border: 2px solid rgba(130, 190, 255, 0.65);
+      border-radius: 4px; z-index: 10; pointer-events: none; image-rendering: pixelated;
+    }
+
+    #pmd-log-box {
+      position: absolute; bottom: 122px; left: 6px; right: 6px; height: 62px;
+      z-index: 10; font-size: 12px; line-height: 1.4; display: flex; flex-direction: column; justify-content: center;
+    }
+    .controller-bar {
+      height: 116px; background: #101824; border-top: 2px solid #2c4260;
+      display: flex; justify-content: space-around; align-items: center; padding: 0 10px; z-index: 15;
+    }
+    .dpad { display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 33px); gap: 4px; }
+    .d-btn {
+      background: #22324a; border: 2px solid #587898; border-radius: 6px; color: #fff;
+      font-weight: bold; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .d-btn:active { background: var(--gold); color: #000; }
+
+    /* 퀴즈 배틀 모달 & 보안 모달 */
+    .modal-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 60;
+      display: none; flex-direction: column; justify-content: center; padding: 14px;
+    }
+    .battle-arena { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; }
+    .combatant-card { flex: 1; background: rgba(10, 22, 38, 0.92); border: 2px solid #4888b8; border-radius: 8px; padding: 8px; text-align: center; }
+    .combatant-card img { width: 80px; height: 80px; image-rendering: pixelated; }
+    .battle-hp-bar { width: 100%; height: 10px; background: #222; border: 1px solid #fff; border-radius: 5px; overflow: hidden; margin-top: 4px; }
+    .battle-hp-fill { height: 100%; background: #48e058; transition: width 0.3s; }
+    .quiz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+    .opt-btn {
+      background: #1c3048; border: 2px solid #6898c8; color: #fff; padding: 11px 9px;
+      border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; text-align: left;
+    }
+    .opt-btn:hover { background: #2c4a6e; border-color: var(--gold); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+    th, td { border: 1px solid #355880; padding: 6px 4px; text-align: center; }
+    th { background: #182c46; color: var(--gold); }
+    .q-row { background: #14243a; border: 1px solid #355880; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- 상단바 -->
+  <div class="top-nav">
+    <div><span id="sync-indicator" class="sync-dot"></span><span id="nav-title">포켓몬 불가사의 던전 DX</span></div>
+    <div style="display:flex; gap:5px;">
+      <button id="btn-dex" class="btn btn-gold" style="padding:4px 8px; font-size:11px; display:none;" onclick="openPokedex()">📖 도감</button>
+      <button class="btn btn-gray" style="padding:4px 8px; font-size:11px;" onclick="openPwModal()">🔒 교사 설정</button>
+    </div>
+  </div>
+
+  <!-- 1. 학생 로그인 화면 -->
+  <div id="screen-login" class="screen active" style="justify-content:center;">
+    <div class="pmd-box">
+      <h2 style="color:var(--gold); text-align:center; margin-bottom:6px;">탐험대 학번 로그인</h2>
+      <p style="font-size:11px; color:#b8d0e8; text-align:center; margin-bottom:14px;">학번과 비밀번호로 접속하면 진도율, 파트너 진화, 340종 도감이 기록됩니다.</p>
+      <label style="font-size:11px; font-weight:bold;">학번 (예: 10101)</label>
+      <input type="text" id="login-id" class="input-field" placeholder="학번 입력 (예: 10101)">
+      <label style="font-size:11px; font-weight:bold;">이름</label>
+      <input type="text" id="login-name" class="input-field" placeholder="이름 입력">
+      <label style="font-size:11px; font-weight:bold;">비밀번호 (최초 로그인 시 자동 등록)</label>
+      <input type="password" id="login-pw" class="input-field" placeholder="••••">
+      <button class="btn btn-gold" style="width:100%; padding:13px; margin-top:4px; font-size:14px;" onclick="studentLogin()">던전 로비 입장 ➔</button>
+      <div style="font-size:9px; color:#7f9cbc; text-align:center; margin-top:8px;">비상업적 교육용 · 스프라이트: PMD SpriteCollab (CC BY-NC 4.0)</div>
+    </div>
+  </div>
+
+  <!-- 2. 단원 선택 로비 -->
+  <div id="screen-lobby" class="screen">
+    <div class="pmd-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div id="st-info" style="font-weight:900; color:var(--gold); font-size:13px;"></div>
+        <div id="st-sub" style="font-size:11px; color:#b8d0e8; margin-top:2px;"></div>
+      </div>
+      <button class="btn btn-gray" style="padding:5px 9px; font-size:11px;" onclick="logoutStudent()">로그아웃</button>
+    </div>
+    <div id="unit-list" style="flex:1; overflow-y:auto;"></div>
+    <button class="btn btn-gold" style="padding:13px; margin-top:6px; font-size:14px;" onclick="goStarterScreen()">파트너 포켓몬 선택 ➔</button>
+  </div>
+
+  <!-- 3. 스타팅 선택 화면 -->
+  <div id="screen-starter" class="screen">
+    <div class="pmd-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-size:13px; font-weight:bold;">1~9세대 파트너 선택</div>
+        <div style="font-size:10px; color:#a8c8e8;">퀴즈 3회 정답 시 1차 진화, 6회 정답 시 최종 진화!</div>
+      </div>
+      <span id="rec-badge" class="badge badge-best">추천: 물 💧</span>
+    </div>
+    <div class="gen-tabs" id="gen-tabs"></div>
+    <div class="starter-grid" id="starter-grid" style="flex:1; align-content:start;"></div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button class="btn btn-gray" style="flex:1;" onclick="showScreen('screen-lobby')">뒤로</button>
+      <button class="btn btn-gold" style="flex:2;" onclick="startDungeon()">던전 입장 (5층 보스전) ➔</button>
+    </div>
+  </div>
+
+  <!-- 4. 동료 & 진화 실루엣 도감 화면 -->
+  <div id="screen-dex" class="screen">
+    <div class="pmd-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-weight:900; color:var(--gold); font-size:13px;">전국 던전 동료 & 진화 도감</div>
+        <div style="font-size:10px; color:#b8d0e8;">각 맵의 출현 포켓몬(45%)과 5층 전설 보스(35%)를 동료로 영입해 실루엣을 밝히세요!</div>
+      </div>
+      <button class="btn btn-gray" style="padding:5px 10px;" onclick="showScreen('screen-lobby')">닫기</button>
+    </div>
+    <div id="dex-container" style="flex:1; overflow-y:auto;"></div>
+  </div>
+
+  <!-- 5. 인게임 던전 화면 -->
+  <div id="screen-game" class="screen">
+    <div class="dungeon-hud pmd-box">
+      <div>
+        <span id="hud-floor" style="color:var(--gold);">B1F/5F</span>
+        <span id="hud-name" style="margin-left:4px;">꾸왁스</span>
+        <span id="hud-lv" style="font-size:11px; color:#98e898; margin-left:3px;">Lv.5</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span>🍎 <span id="hud-belly">100</span>%</span>
+        <span>HP <span id="hud-hp">100/100</span></span>
+        <div class="hp-wrap"><div id="hud-hp-fill" class="hp-fill"></div></div>
+      </div>
+    </div>
+
+    <div id="viewport">
+      <canvas id="dungeonCanvas" width="540" height="540"></canvas>
+      <canvas id="minimapCanvas" width="104" height="104"></canvas>
+    </div>
+
+    <div id="pmd-log-box" class="pmd-box">
+      <div id="log-1" style="color:#fff; font-weight:bold;">던전에 입장했다!</div>
+      <div id="log-2" style="color:#a8c8e8; font-size:11px; margin-top:2px;">퀴즈를 맞혀 진화하고 5층 전설의 보스를 물리치자!</div>
+    </div>
+
+    <div class="controller-bar">
+      <div class="dpad" id="dpad">
+        <button class="d-btn" data-d="-1,-1">↖</button><button class="d-btn" data-d="0,-1">▲</button><button class="d-btn" data-d="1,-1">↗</button>
+        <button class="d-btn" data-d="-1,0">◀</button><button class="d-btn" data-d="0,0" style="font-size:10px;">대기</button><button class="d-btn" data-d="1,0">▶</button>
+        <button class="d-btn" data-d="-1,1">↙</button><button class="d-btn" data-d="0,1">▼</button><button class="d-btn" data-d="1,1">↘</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <div id="hud-evo-prog" style="font-size:10px; color:var(--gold); text-align:center; font-weight:bold;">진화까지 정답 3회 남음</div>
+        <button class="btn" style="padding:6px 10px;" onclick="useOranBerry()">오랭열매 회복 (<span id="berry-cnt">2</span>)</button>
+        <button class="btn btn-gray" style="padding:6px 10px;" onclick="abortDungeon()">포기하고 로비로</button>
+      </div>
+    </div>
+
+    <!-- 전투 퀴즈 오버레이 -->
+    <div id="quiz-overlay" class="modal-overlay">
+      <div class="pmd-box">
+        <div id="boss-banner" style="display:none; background:#c82828; color:#fff; font-weight:900; text-align:center; padding:4px; border-radius:4px; margin-bottom:8px; font-size:11px;">
+          ⚠️ 5층 전설 보스 배틀! 연속 퀴즈로 보스의 HP를 모두 깎으세요!
+        </div>
+        <div class="battle-arena">
+          <div class="combatant-card">
+            <img id="b-p-img" src="">
+            <div id="b-p-name" style="font-weight:800; font-size:12px;"></div>
+            <div id="b-p-hp-txt" style="font-size:10px; color:#a8e8a8;">HP 100/100</div>
+            <div class="battle-hp-bar"><div id="b-p-hp-fill" class="battle-hp-fill"></div></div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:18px; font-weight:900; color:var(--gold);">VS</div>
+            <div id="b-adv" class="badge badge-best" style="margin-top:4px;">상성 유리</div>
+          </div>
+          <div class="combatant-card">
+            <img id="b-e-img" src="">
+            <div id="b-e-name" style="font-weight:800; font-size:12px;"></div>
+            <div id="b-e-hp-txt" style="font-size:10px; color:#f8a8a8;">HP 80/80</div>
+            <div class="battle-hp-bar"><div id="b-e-hp-fill" class="battle-hp-fill" style="background:#f05858;"></div></div>
+          </div>
+        </div>
+        <div style="border-top:2px solid var(--pmd-inner); padding-top:8px;">
+          <div id="q-text" style="font-size:13px; font-weight:800; color:var(--gold); line-height:1.4;"></div>
+          <div class="quiz-grid" id="q-options"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 교사 전용 관리자 화면 -->
+  <div id="screen-teacher" class="screen">
+    <div class="pmd-box" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-weight:900; color:var(--gold); font-size:13px;">👩‍🏫 교사 통합 관리 & 실시간 진도율</span>
+      <button class="btn btn-gray" style="padding:4px 9px;" onclick="closeTeacherScreen()">닫기</button>
+    </div>
+
+    <div style="display:flex; gap:4px; margin-bottom:8px;">
+      <button class="btn btn-gold" style="flex:1;" onclick="setTeacherTab('progress')">📊 실시간 진도율</button>
+      <button class="btn" style="flex:1;" onclick="setTeacherTab('edit')">📝 단원/문제 편집</button>
+      <button class="btn btn-gray" style="flex:1;" onclick="setTeacherTab('cloud')">☁️ 연결 안내</button>
+    </div>
+
+    <!-- 탭 1: 학생 실시간 진도율 -->
+    <div id="t-tab-progress" style="flex:1; overflow-y:auto;">
+      <div class="pmd-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <select id="t-class-sel" class="input-field" style="width:auto; margin:0; padding:4px 6px;" onchange="loadProgress()"></select>
+          <button class="btn btn-gold" style="padding:3px 8px; font-size:10px;" onclick="exportStudentCSV()">📥 엑셀(CSV) 저장</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>학번</th><th>이름</th><th>현재 상태</th><th>클리어 단원</th><th>정답률</th><th>도감</th><th>관리</th></tr>
+          </thead>
+          <tbody id="t-progress-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 탭 2: 노코드 단원/문제 에디터 -->
+    <div id="t-tab-edit" style="display:none; flex:1; overflow-y:auto;">
+      <div class="pmd-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label style="font-size:11px; font-weight:bold;">단원 선택</label>
+          <button class="btn btn-gold" style="padding:3px 8px; font-size:10px;" onclick="addNewUnit()">+ 새 단원 추가</button>
+        </div>
+        <select id="t-unit-sel" class="input-field" onchange="loadUnitToUI()"></select>
+        <label style="font-size:11px; font-weight:bold;">단원명</label>
+        <input type="text" id="t-unit-title" class="input-field">
+        <label style="font-size:11px; font-weight:bold;">던전 맵 테마 (20종 고유 그래픽 & 전설 보스)</label>
+        <select id="t-biome-sel" class="input-field"></select>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:8px 0 6px;">
+          <span style="font-size:12px; font-weight:900; color:var(--gold);">출제 문항 리스트 (첫 번째 칸에 정답 입력)</span>
+          <button class="btn" style="padding:3px 8px; font-size:10px;" onclick="addQRow()">+ 문항 추가</button>
+        </div>
+        <div id="t-q-list"></div>
+        <div style="display:flex; gap:6px; margin-top:10px;">
+          <button class="btn btn-red" style="flex:1;" onclick="deleteUnit()">단원 삭제</button>
+          <button class="btn btn-gold" style="flex:2;" onclick="saveUnitUI()">💾 저장 및 전교생 실시간 배포</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 탭 3: 연결 안내 -->
+    <div id="t-tab-cloud" style="display:none; flex:1; overflow-y:auto;">
+      <div class="pmd-box">
+        <h4 style="color:var(--gold); margin-bottom:6px;">☁️ 연결 상태</h4>
+        <p id="cloud-status" style="font-size:12px; line-height:1.5;"></p>
+        <p style="font-size:11px; color:#b8d0e8; line-height:1.5; margin-top:8px;">Firebase 주소와 API 키는 파일 맨 위 <code>CONFIG</code>에서 수정합니다. 교사 비밀번호는 파일에 저장되지 않고 Firebase 교사 계정으로 확인됩니다.</p>
+      </div>
+      <input type="hidden" id="fb-url-input">
+    </div>
+  </div>
+
+  <!-- 교사 비밀번호 입력 전용 모달 (* 마스킹 처리) -->
+  <div id="pw-modal" class="modal-overlay">
+    <div class="pmd-box" style="max-width:340px; margin:0 auto; width:100%;">
+      <h3 style="color:var(--gold); text-align:center; margin-bottom:8px;">🔒 교사 관리자 인증</h3>
+      <p style="font-size:11px; color:#b8d0e8; text-align:center; margin-bottom:10px;">교사 계정 비밀번호를 입력하세요</p>
+      <input type="password" id="teacher-pw-input" class="input-field" placeholder="••••" style="text-align:center; font-size:18px; letter-spacing:4px;">
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-gray" style="flex:1;" onclick="closePwModal()">취소</button>
+        <button class="btn btn-gold" style="flex:1;" onclick="verifyTeacherPw()">확인</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ★★★ 배포 전에 여기만 고치세요 (모든 학생 기기에 똑같이 적용됩니다) ★★★ */
+const CONFIG = {
+  FIREBASE_URL: "https://pkmbio-default-rtdb.asia-southeast1.firebasedatabase.app/",     // 예: "https://내프로젝트-default-rtdb.asia-southeast1.firebasedatabase.app"
+  API_KEY: "AIzaSyCbCdADN0QRXugxiDX-br6V8eI3KNZBWaw",          // Firebase 프로젝트 설정 > 일반 > 웹 API 키
+  TEACHER_EMAIL: "oyj12oyj@gmail.com",    // Authentication에서 만든 교사 계정 이메일 (비밀번호는 파일에 적지 않습니다)
+  TEACHER_PW: "1234"    // Firebase를 쓰지 않는 로컬 테스트에서만 사용됩니다
+};
+let firebaseURL = CONFIG.FIREBASE_URL, teacherPw = CONFIG.TEACHER_PW;
+/* =========================================================================
+ * 1. 20종 고유 바이옴 테마 & 던전당 12마리 출현 포켓몬 + 보스 (총 260종 + 스타팅 81종)
+ * ========================================================================= */
+const BIOMES = [
+  { id:"b1", name:"심연의 수정 동굴", rec:"water", prop:"crystal", pal:{wTop:"#161e36",wSide:"#283864",fA:"#384e7c",fB:"#30436c",cor:"#22304e",acc:"#68f0ff"},
+    pokes:[74,75,95,213,246,299,302,303,304,524,703,969], boss:{id:719,name:"디안시"} },
+  { id:"b2", name:"신비의 에메랄드 원시림", rec:"fire", prop:"forest", pal:{wTop:"#122a1b",wSide:"#204a30",fA:"#386c4a",fB:"#2f5c3e",cor:"#22442e",acc:"#88ff68"},
+    pokes:[10,43,69,187,285,315,420,540,548,753,919,928], boss:{id:251,name:"세레비"} },
+  { id:"b3", name:"작열하는 마그마 화산", rec:"water", prop:"lava", pal:{wTop:"#361010",wSide:"#5c1e1e",fA:"#78362e",fB:"#6a2e26",cor:"#4c201a",acc:"#ff6020"},
+    pokes:[37,58,77,126,218,228,322,324,513,631,850,935], boss:{id:383,name:"그란돈"} },
+  { id:"b4", name:"얼어붙은 빙하 동굴", rec:"fire", prop:"ice", pal:{wTop:"#163656",wSide:"#2a5e86",fA:"#5494c4",fB:"#4886b4",cor:"#36668e",acc:"#e0ffff"},
+    pokes:[86,90,215,220,361,363,459,582,613,712,872,974], boss:{id:144,name:"프리져"} },
+  { id:"b5", name:"방전되는 번개 고원", rec:"grass", prop:"spark", pal:{wTop:"#363012",wSide:"#5e521e",fA:"#7e7032",fB:"#70622a",cor:"#50461c",acc:"#fff038"},
+    pokes:[25,81,100,179,239,309,403,417,522,702,921,938], boss:{id:145,name:"썬더"} },
+  { id:"b6", name:"심해의 해저 신전", rec:"grass", prop:"water", pal:{wTop:"#0e2242",wSide:"#1a3a6c",fA:"#2a5696",fB:"#224a84",cor:"#183662",acc:"#48b8ff"},
+    pokes:[54,60,116,120,170,222,366,456,592,746,963,976], boss:{id:382,name:"가이오가"} },
+  { id:"b7", name:"모래폭풍 사막 유적", rec:"water", prop:"ruin", pal:{wTop:"#42321a",wSide:"#6c522c",fA:"#967646",fB:"#886a3e",cor:"#624c2c",acc:"#ffd878"},
+    pokes:[27,50,104,207,231,328,343,449,529,551,749,946], boss:{id:377,name:"레지락"} },
+  { id:"b8", name:"유령의 안개 묘지", rec:"water", prop:"grave", pal:{wTop:"#201632",wSide:"#362652",fA:"#4c3870",fB:"#413062",cor:"#2e2146",acc:"#b880ff"},
+    pokes:[92,93,200,353,355,425,562,607,708,778,854,971], boss:{id:487,name:"기라티나"} },
+  { id:"b9", name:"맹독의 자수정 늪지대", rec:"fire", prop:"swamp", pal:{wTop:"#281430",wSide:"#462454",fA:"#563666",fB:"#4c2e5a",cor:"#362040",acc:"#d048ff"},
+    pokes:[23,41,88,109,194,316,336,434,451,453,568,944], boss:{id:890,name:"무한다이노"} },
+  { id:"b10", name:"고대 기계 태엽 성채", rec:"fire", prop:"gear", pal:{wTop:"#22282e",wSide:"#3a444e",fA:"#56626e",fB:"#4c5662",cor:"#363e46",acc:"#c0d8e8"},
+    pokes:[82,205,227,305,374,436,597,599,624,679,808,959], boss:{id:379,name:"레지스틸"} },
+  { id:"b11", name:"요정의 벚꽃 정원", rec:"fire", prop:"flower", pal:{wTop:"#361a2a",wSide:"#5c2e48",fA:"#864a6c",fB:"#784060",cor:"#562c44",acc:"#ffb0e0"},
+    pokes:[35,39,173,175,183,280,300,546,669,684,761,926], boss:{id:716,name:"제르네아스"} },
+  { id:"b12", name:"유성이 떨어진 운석 폭포", rec:"water", prop:"crystal", pal:{wTop:"#1a1838",wSide:"#2c2a5e",fA:"#424082",fB:"#383672",cor:"#262450",acc:"#8090ff"},
+    pokes:[147,148,333,371,372,443,610,633,696,704,885,996], boss:{id:384,name:"레쿠쟈"} },
+  { id:"b13", name:"천공의 구름 탑", rec:"fire", prop:"cloud", pal:{wTop:"#22364a",wSide:"#3a5a7a",fA:"#5682aa",fB:"#4a749a",cor:"#365672",acc:"#ffffff"},
+    pokes:[16,21,163,198,276,278,396,519,661,821,940,962], boss:{id:249,name:"루기아"} },
+  { id:"b14", name:"무지개 성스러운 산", rec:"water", prop:"ruin", pal:{wTop:"#382416",wSide:"#5e3e26",fA:"#865a3a",fB:"#784e32",cor:"#563822",acc:"#ffaa40"},
+    pokes:[59,78,136,196,197,240,359,447,570,636,662,936], boss:{id:250,name:"칠색조"} },
+  { id:"b15", name:"시공간의 균열 회랑", rec:"water", prop:"crystal", pal:{wTop:"#2a163a",wSide:"#482662",fA:"#663a8a",fB:"#5a327a",cor:"#402258",acc:"#ff70ff"},
+    pokes:[63,64,79,96,177,201,325,517,574,577,605,955], boss:{id:483,name:"디아루가"} },
+  { id:"b16", name:"진홍빛 고대 밀림", rec:"water", prop:"forest", pal:{wTop:"#301a16",wSide:"#522e26",fA:"#724438",fB:"#643a30",cor:"#482a22",acc:"#ff8060"},
+    pokes:[138,140,142,345,347,408,410,564,566,984,986,987], boss:{id:1007,name:"코라이돈"} },
+  { id:"b17", name:"네온 사이버 연구소", rec:"grass", prop:"gear", pal:{wTop:"#122636",wSide:"#20425e",fA:"#306086",fB:"#285274",cor:"#1c3a52",acc:"#00ffff"},
+    pokes:[137,233,474,479,622,737,990,991,992,993,994,995], boss:{id:1008,name:"미라이돈"} },
+  { id:"b18", name:"칠흑의 다크 크레이터", rec:"water", prop:"lava", pal:{wTop:"#16121a",wSide:"#2a2232",fA:"#40344c",fB:"#362c40",cor:"#241c2c",acc:"#ff4060"},
+    pokes:[198,215,229,261,302,342,430,509,559,629,859,942], boss:{id:491,name:"다크라이"} },
+  { id:"b19", name:"거대 폭포수 대협곡", rec:"grass", prop:"water", pal:{wTop:"#142a32",wSide:"#244a56",fA:"#366c7e",fB:"#2e5e6e",cor:"#20424e",acc:"#60f0ff"},
+    pokes:[129,130,183,270,283,339,341,349,418,535,550,950], boss:{id:245,name:"스이쿤"} },
+  { id:"b20", name:"별빛이 내리는 천문대", rec:"fire", prop:"spark", pal:{wTop:"#10162e",wSide:"#1e2850",fA:"#2e3e76",fB:"#263466",cor:"#1a2448",acc:"#fff890"},
+    pokes:[35,120,173,174,175,337,338,433,531,707,774,969], boss:{id:385,name:"지라치"} }
+];
+
+/* 1~9세대 스타팅 (3단계 진화 체인: id, id+1, id+2 자동 매핑) */
+const STARTERS = [
+  { gen:1, id:1, names:["이상해씨","이상해풀","이상해꽃"], type:"grass" },
+  { gen:1, id:4, names:["파이리","리자드","리자몽"], type:"fire" },
+  { gen:1, id:7, names:["꼬부기","어니부기","거북왕"], type:"water" },
+  { gen:2, id:152, names:["치코리타","베이리프","메가니움"], type:"grass" },
+  { gen:2, id:155, names:["브케인","마그케인","블레이범"], type:"fire" },
+  { gen:2, id:158, names:["리아코","엘리게이","장크로다일"], type:"water" },
+  { gen:3, id:252, names:["나무지기","나무돌이","나무킹"], type:"grass" },
+  { gen:3, id:255, names:["아차모","영치코","번치코"], type:"fire" },
+  { gen:3, id:258, names:["물짱이","늪짱이","대짱이"], type:"water" },
+  { gen:4, id:387, names:["모부기","수풀부기","토대부기"], type:"grass" },
+  { gen:4, id:390, names:["불꽃숭이","파이숭이","초염몽"], type:"fire" },
+  { gen:4, id:393, names:["팽도리","팽태자","엠페르트"], type:"water" },
+  { gen:5, id:495, names:["주리비얀","샤비","샤로다"], type:"grass" },
+  { gen:5, id:498, names:["뚜꾸리","차오꿀","염무왕"], type:"fire" },
+  { gen:5, id:501, names:["수댕이","쌍검자비","대검귀"], type:"water" },
+  { gen:6, id:650, names:["도치마론","도치보구","브리가론"], type:"grass" },
+  { gen:6, id:653, names:["푸호꼬","테르나","마폭시"], type:"fire" },
+  { gen:6, id:656, names:["개구마르","개굴반장","개굴닌자"], type:"water" },
+  { gen:7, id:722, names:["나몰빼미","빼미스로우","모크나이퍼"], type:"grass" },
+  { gen:7, id:725, names:["냐오불","냐오히트","어흥염"], type:"fire" },
+  { gen:7, id:728, names:["누리공","키요공","누리레느"], type:"water" },
+  { gen:8, id:810, names:["흥나숭","채키몽","고릴타"], type:"grass" },
+  { gen:8, id:813, names:["염버니","래비풋","에이스번"], type:"fire" },
+  { gen:8, id:816, names:["울머기","누겔레온","인텔리레온"], type:"water" },
+  { gen:9, id:906, names:["나오하","나로테","마스카나"], type:"grass" },
+  { gen:9, id:909, names:["뜨아거","악뜨거","라우드본"], type:"fire" },
+  { gen:9, id:912, names:["꾸왁스","아꾸왁","웨이니발"], type:"water" }
+];
+
+const SKILLS = {
+  grass: { super: "플라워트릭/하드플랜트", normal: "리프블레이드", fail: "몸통박치기" },
+  fire:  { super: "플레어송/블러스트번", normal: "화염방사", fail: "할퀴기" },
+  water: { super: "아쿠아스텝/하이드로캐논", normal: "물의파동", fail: "물튀기기" }
+};
+
+/* 한국어 포켓몬 이름 자동 캐싱 (PokeAPI 연동) */
+const korNameCache = JSON.parse(localStorage.getItem("PMD_KOR_NAMES")) || {};
+async function fetchKorName(id) {
+  if (korNameCache[id]) return korNameCache[id];
+  try {
+    const res = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${id}/`);
+    const data = await res.json();
+    const ko = data.names.find(n => n.language.name === "ko");
+    if (ko) {
+      korNameCache[id] = ko.name;
+      localStorage.setItem("PMD_KOR_NAMES", JSON.stringify(korNameCache));
+      return ko.name;
+    }
+  } catch (e) {}
+  return `포켓몬#${id}`;
+}
+function getKorNameSync(id, fallback) {
+  return korNameCache[id] || fallback || `No.${id}`;
+}
+
+const DEFAULT_UNITS = [
+  { unitId:"u1", unitTitle:"1단원: 세포 호흡과 산화적 인산화", biomeId:"b1", questions:[
+    { q:"미토콘드리아에서 전자전달계와 ATP 합성효소가 위치한 장소는?", a:"내막", options:["내막","외막","기질","세포질"] },
+    { q:"전자전달계에서 능동수송된 수소 이온(H+)이 확산되며 ATP를 합성하는 방식은?", a:"산화적 인산화", options:["산화적 인산화","기질 수준 인산화","광인산화","발효"] },
+    { q:"해당과정에서 포도당 1분자가 피루브산 2분자로 분해될 때 순수 생성되는 ATP는?", a:"2 ATP", options:["2 ATP","4 ATP","32 ATP","38 ATP"] },
+    { q:"전자전달계에서 최종적으로 전자를 받아 물(H2O)을 생성하는 기체는?", a:"산소(O2)", options:["산소(O2)","이산화탄소(CO2)","질소(N2)","수소(H2)"] }
+  ]},
+  { unitId:"u2", unitTitle:"2단원: 식물의 광합성과 탄소 고정", biomeId:"b2", questions:[
+    { q:"엽록체에서 빛에너지를 흡수하여 물의 광분해가 일어나는 장소는?", a:"틸라코이드 막", options:["틸라코이드 막","스트로마","외막","세포질"] },
+    { q:"명반응에서 생성되어 캘빈 회로에 공급되는 고에너지 물질 두 가지는?", a:"ATP와 NADPH", options:["ATP와 NADPH","ADP와 NADP+","ATP와 NADH","포도당과 산소"] },
+    { q:"캘빈 회로에서 이산화탄소(CO2)를 최초로 고정하는 5탄당 화합물은?", a:"RuBP", options:["RuBP","3PG","G3P","피루브산"] }
+  ]},
+  { unitId:"u3", unitTitle:"3단원: 세포막을 통한 물질 이동", biomeId:"b3", questions:[
+    { q:"ATP를 소모하며 농도 기울기를 거슬러 물질을 이동시키는 방식은?", a:"능동 수송", options:["능동 수송","단순 확산","촉진 확산","삼투"] },
+    { q:"식물 세포를 고장액에 넣었을 때 세포막이 세포벽에서 떨어지는 현상은?", a:"원형질 분리", options:["원형질 분리","용혈 현상","팽윤 상태","세포내 섭취"] },
+    { q:"세포막에서 나트륨(Na+)은 밖으로, 칼륨(K+)은 안으로 능동수송하는 단백질은?", a:"Na+-K+ 펌프", options:["Na+-K+ 펌프","아쿠아포린","이온 통로","포도당 수송체"] }
+  ]}
+];
+
+let unitsData = JSON.parse(localStorage.getItem("PMD_UNITS_V3")) || DEFAULT_UNITS;
+let studentsDB = JSON.parse(localStorage.getItem("PMD_STUDENTS_V3")) || {};
+
+let currentStudent = null;
+let curUnit = unitsData[0];
+let curStarter = STARTERS[26];
+let curGen = 9;
+
+const spriteCache = {};
+function getPokeImg(id) {
+  if (!spriteCache[id]) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+    spriteCache[id] = img;
+  }
+  return spriteCache[id];
+}
+function getBiome(id) { return BIOMES.find(b => b.id === id) || BIOMES[0]; }
+
+/* =========================================================================
+ * 2. 파이어베이스: 학생은 자기 기록 1건만, 교사는 반 단위 요약만 주고받음 (1,000명 규모 대응)
+ *    DB 구조: units / students/학번(전체 기록) / summary/학번(교사용 요약 한 줄)
+ * ========================================================================= */
+const useCloud = () => !!firebaseURL.trim();
+let auth = null; // 로그인한 Firebase 사용자 (학생 또는 교사)
+async function authCall(kind, email, password) {
+  const r = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:" + kind + "?key=" + CONFIG.API_KEY,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, returnSecureToken: true }) });
+  const d = await r.json();
+  if (!r.ok) throw new Error((d.error && d.error.message) || "AUTH_ERROR");
+  auth = { idToken: d.idToken, refreshToken: d.refreshToken, exp: Date.now() + (+d.expiresIn - 120) * 1000 };
+}
+async function getToken() { // 토큰은 1시간마다 만료 → 자동 갱신
+  if (!auth) return null;
+  if (Date.now() > auth.exp) {
+    const r = await fetch("https://securetoken.googleapis.com/v1/token?key=" + CONFIG.API_KEY,
+      { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: "grant_type=refresh_token&refresh_token=" + encodeURIComponent(auth.refreshToken) });
+    const d = await r.json();
+    if (!r.ok) throw new Error("REFRESH_FAILED");
+    auth = { idToken: d.id_token, refreshToken: d.refresh_token, exp: Date.now() + (+d.expires_in - 120) * 1000 };
+  }
+  return auth.idToken;
+}
+async function fb(path, method = "GET", body) {
+  const tok = await getToken();
+  const url = firebaseURL.trim().replace(/\/$/, "") + "/pmd_classroom" + path + (tok ? (path.includes("?") ? "&" : "?") + "auth=" + tok : "");
+  const r = await fetch(url, { method, keepalive: method !== "GET", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+}
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+async function hashPw(id, pw) {
+  const s = "pmd|" + id + "|" + pw;
+  try {
+    const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+  } catch (e) { let h = 5381; for (const ch of s) h = ((h << 5) + h + ch.charCodeAt(0)) | 0; return "x" + h; }
+}
+const summaryOf = s => ({ id:s.id, name:s.name, status:s.status || "", cleared:(s.clearedUnits || []).length,
+  correct:s.correct || 0, total:s.total || 0, dex:(s.unlockedDex || []).length, ts:Date.now() });
+const saveLocalDB = () => localStorage.setItem("PMD_STUDENTS_V3", JSON.stringify(studentsDB));
+
+async function syncFromCloud() { // 단원 문제만 동기화
+  const dot = document.getElementById('sync-indicator');
+  if (!useCloud()) { dot.className = "sync-dot"; return; }
+  try {
+    const u = await fb("/units.json");
+    dot.className = "sync-dot online";
+    if (Array.isArray(u) && u.length) {
+      unitsData = u.filter(Boolean);
+      localStorage.setItem("PMD_UNITS_V3", JSON.stringify(unitsData));
+      curUnit = unitsData.find(x => x.unitId === curUnit.unitId) || unitsData[0];
+    }
+  } catch (e) { dot.className = "sync-dot"; }
+}
+let pushTimer = null; // 저장은 4초씩 모아서 한 번에 (중요한 순간만 즉시 저장)
+function pushStudentToCloud(now) {
+  if (!currentStudent) return Promise.resolve();
+  studentsDB[currentStudent.id] = currentStudent;
+  if (!useCloud()) { saveLocalDB(); return Promise.resolve(); }
+  if (now) { clearTimeout(pushTimer); pushTimer = null; return doPush(); }
+  if (!pushTimer) pushTimer = setTimeout(() => { pushTimer = null; doPush(); }, 4000);
+  return Promise.resolve();
+}
+async function doPush() {
+  const s = currentStudent; if (!s) return;
+  try { await fb(".json", "PATCH", { ["students/" + s.id]: s, ["summary/" + s.id]: summaryOf(s) }); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && pushTimer) pushStudentToCloud(true); });
+async function pushUnitsToCloud() {
+  localStorage.setItem("PMD_UNITS_V3", JSON.stringify(unitsData));
+  if (!useCloud()) return;
+  try { await fb("/units.json", "PUT", unitsData); } catch (e) {}
+}
+
+let lastAll = 0;
+setInterval(() => { // 교사 화면: 반 선택 시 5초, 전체 보기는 15초
+  if (!document.getElementById('screen-teacher').classList.contains('active') || document.getElementById('t-tab-progress').style.display === 'none') return;
+  if (classPrefix() || Date.now() - lastAll > 15000) { if (!classPrefix()) lastAll = Date.now(); loadProgress(); }
+}, 5000);
+setInterval(() => { if (currentStudent && document.getElementById('screen-lobby').classList.contains('active')) syncFromCloud(); }, 120000);
+
+/* =========================================================================
+ * 3. 학생 로그인 & 로비 & 도감 (341종 실루엣)
+ * ========================================================================= */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+async function studentLogin() {
+  const id = document.getElementById('login-id').value.trim();
+  const name = document.getElementById('login-name').value.trim();
+  const pw = document.getElementById('login-pw').value.trim();
+  if (!id || !name || !pw) { alert("학번, 이름, 비밀번호를 모두 입력해 주세요."); return; }
+  if (!/^[0-9A-Za-z가-힣_-]{1,20}$/.test(id)) { alert("학번은 숫자(또는 영문)만 입력해 주세요."); return; }
+  let rec;
+  if (useCloud()) { // Firebase Authentication이 비밀번호 확인·시도 제한을 담당
+    const apw = "pmd-" + pw;
+    try {
+      const gen = (await fb("/gen/" + id + ".json")) || "0", email = `${id}-${gen}@pmd.local`;
+      try { await authCall("signInWithPassword", email, apw); }
+      catch (e) {
+        if (!/INVALID_LOGIN|EMAIL_NOT_FOUND|INVALID_PASSWORD|INVALID_CREDENTIAL/.test(e.message)) throw e;
+        try { await authCall("signUp", email, apw); } // 처음 접속이면 자동 등록
+        catch (e2) { if (/EMAIL_EXISTS/.test(e2.message)) { alert("비밀번호가 일치하지 않습니다!"); return; } throw e2; }
+      }
+      rec = await fb("/students/" + id + ".json");
+    } catch (e) {
+      alert(/TOO_MANY/.test(e.message) ? "시도가 너무 많습니다. 잠시 후 다시 시도해 주세요." : "서버에 연결할 수 없습니다. 인터넷을 확인하고 다시 시도해 주세요.");
+      return;
+    }
+    rec = rec || { id, name }; delete rec.pw; delete rec.pwh;
+  } else { // Firebase 없이 이 기기에서만 테스트할 때
+    const pwh = await hashPw(id, pw); rec = studentsDB[id];
+    if (!rec) rec = { id, name, pwh };
+    else if (rec.pwh && rec.pwh !== pwh) { alert("비밀번호가 일치하지 않습니다!"); return; }
+    else rec.pwh = pwh;
+  }
+  rec.id = id; rec.name = name;
+  rec.clearedUnits = rec.clearedUnits || []; rec.unlockedDex = rec.unlockedDex || [];
+  rec.correct = rec.correct || 0; rec.total = rec.total || 0; rec.status = "로비 대기중";
+  currentStudent = rec;
+  await syncFromCloud();
+  await pushStudentToCloud(true);
+  document.getElementById('btn-dex').style.display = 'inline-block';
+  renderLobby();
+  showScreen('screen-lobby');
+}
+
+function logoutStudent() {
+  pushStudentToCloud(true); auth = null;
+  currentStudent = null;
+  document.getElementById('btn-dex').style.display = 'none';
+  showScreen('screen-login');
+}
+
+function renderLobby() {
+  if (!currentStudent) return;
+  const cleared = currentStudent.clearedUnits.length;
+  const totalU = unitsData.length;
+  const pct = totalU > 0 ? Math.round((cleared / totalU) * 100) : 0;
+
+  document.getElementById('st-info').innerText = `[${currentStudent.id}] ${currentStudent.name} 대원`;
+  document.getElementById('st-sub').innerText = `진도율: ${cleared}/${totalU} 단원 (${pct}%) | 도감 등록: ${currentStudent.unlockedDex.length}종`;
+
+  const wrap = document.getElementById('unit-list');
+  wrap.innerHTML = "";
+  const tKor = { water:"물 💧", fire:"불꽃 🔥", grass:"풀 🌿" };
+
+  unitsData.forEach(u => {
+    const b = getBiome(u.biomeId);
+    const isClear = currentStudent.clearedUnits.includes(u.unitId);
+    const card = document.createElement('div');
+    card.className = `pmd-box unit-card ${u.unitId === curUnit.unitId ? 'selected' : ''}`;
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span style="font-weight:900; font-size:14px;">${isClear ? '👑 ' : ''}${u.unitTitle}</span>
+        <span class="badge badge-best">추천: ${tKor[b.rec]}</span>
+      </div>
+      <div style="font-size:11px; color:#b8d0e8;">테마: <b>${b.name}</b> | 출현: 12종 + 보스 <b>${b.boss.name}</b></div>
+    `;
+    card.onclick = () => { curUnit = u; renderLobby(); };
+    wrap.appendChild(card);
+  });
+}
+
+function goStarterScreen() {
+  const b = getBiome(curUnit.biomeId);
+  const tKor = { water:"물 💧", fire:"불꽃 🔥", grass:"풀 🌿" };
+  document.getElementById('rec-badge').innerText = `추천: ${tKor[b.rec]}`;
+  const rec = STARTERS.find(s => s.gen === curGen && s.type === b.rec);
+  if (rec) curStarter = rec;
+  renderGenTabs();
+  renderStarterGrid();
+  showScreen('screen-starter');
+}
+
+function renderGenTabs() {
+  const w = document.getElementById('gen-tabs');
+  w.innerHTML = "";
+  for (let g = 1; g <= 9; g++) {
+    const d = document.createElement('div');
+    d.className = `gen-tab ${g === curGen ? 'active' : ''}`;
+    d.innerText = `${g}세대`;
+    d.onclick = () => { curGen = g; renderGenTabs(); renderStarterGrid(); };
+    w.appendChild(d);
+  }
+}
+
+function renderStarterGrid() {
+  const b = getBiome(curUnit.biomeId);
+  const g = document.getElementById('starter-grid');
+  g.innerHTML = "";
+  STARTERS.filter(s => s.gen === curGen).forEach(p => {
+    getPokeImg(p.id);
+    const best = p.type === b.rec;
+    const c = document.createElement('div');
+    c.className = `pmd-box starter-card ${p.id === curStarter.id ? 'selected' : ''}`;
+    c.innerHTML = `
+      ${best ? '<div class="badge badge-best" style="position:absolute; top:4px; right:4px;">추천★</div>' : ''}
+      <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png">
+      <div style="font-weight:800; font-size:12px;">${p.names[0]}</div>
+      <div style="font-size:9px; color:#98b8d8; margin-bottom:3px;">➔ ${p.names[1]} ➔ ${p.names[2]}</div>
+      <span class="badge badge-${p.type}">${p.type.toUpperCase()}</span>
+    `;
+    c.onclick = () => { curStarter = p; renderStarterGrid(); };
+    g.appendChild(c);
+  });
+}
+
+async function openPokedex() {
+  if (!currentStudent) return;
+  const wrap = document.getElementById('dex-container');
+  wrap.innerHTML = "";
+
+  // 1. 스타팅 진화 도감 (81종)
+  const stBox = document.createElement('div');
+  stBox.className = "pmd-box";
+  stBox.style.marginBottom = "10px";
+  let stHtml = "";
+  STARTERS.forEach(s => {
+    for (let stage = 0; stage < 3; stage++) {
+      const pid = s.id + stage;
+      const unl = currentStudent.unlockedDex.includes(pid);
+      stHtml += `
+        <div class="dex-slot ${unl ? '' : 'locked'}">
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pid}.png">
+          <div style="font-size:10px; font-weight:bold; color:${unl ? '#fff' : '#688098'};">${unl ? s.names[stage] : '???'}</div>
+        </div>
+      `;
+    }
+  });
+  stBox.innerHTML = `<div style="font-size:12px; font-weight:900; color:var(--gold);">🌟 스타팅 파트너 진화 도감 (81종)</div><div class="dex-grid">${stHtml}</div>`;
+  wrap.appendChild(stBox);
+
+  // 2. 20개 던전별 출현 포켓몬 (12종 + 보스 1종 = 각 13종)
+  BIOMES.forEach(b => {
+    const box = document.createElement('div');
+    box.className = "pmd-box";
+    box.style.marginBottom = "10px";
+    let html = "";
+    b.pokes.forEach(pid => {
+      const unl = currentStudent.unlockedDex.includes(pid);
+      const kName = getKorNameSync(pid);
+      if (unl && !korNameCache[pid]) fetchKorName(pid);
+      html += `
+        <div class="dex-slot ${unl ? '' : 'locked'}">
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pid}.png">
+          <div style="font-size:10px; font-weight:bold; color:${unl ? '#fff' : '#688098'};">${unl ? kName : '???'}</div>
+        </div>
+      `;
+    });
+    const bUnl = currentStudent.unlockedDex.includes(b.boss.id);
+    html += `
+      <div class="dex-slot dex-boss ${bUnl ? '' : 'locked'}">
+        <div style="font-size:9px; color:var(--gold); font-weight:900;">★BOSS</div>
+        <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${b.boss.id}.png">
+        <div style="font-size:10px; font-weight:bold; color:${bUnl ? '#fff' : '#688098'};">${bUnl ? b.boss.name : '???'}</div>
+      </div>
+    `;
+    box.innerHTML = `<div style="font-size:12px; font-weight:900; color:var(--gold);">🗺️ ${b.name} (13종)</div><div class="dex-grid">${html}</div>`;
+    wrap.appendChild(box);
+  });
+
+  showScreen('screen-dex');
+}
+
+/* =========================================================================
+ * 4. 던전 생성(그리드 방 + 복도) · 맵 한 장 베이킹 · PMD 스프라이트 · 연속 이동 엔진
+ * ========================================================================= */
+const TS=24, MW=48, MH=36, CW=12, CH=12, GX=4, GY=3, MAX_FLOOR=5, ENEMIES=8;
+const T_WALL=0, T_FLOOR=1, T_CORRIDOR=2;
+const DIRS=[[0,1],[1,1],[1,0],[1,-1],[0,-1],[-1,-1],[-1,0],[-1,1]]; // PMD 시트 행 순서
+const dirIdx=(dx,dy)=>DIRS.findIndex(d=>d[0]===dx&&d[1]===dy);
+const rnd=n=>Math.floor(Math.random()*n);
+const hash=(x,y,s=0)=>{const n=Math.sin(x*127.1+y*311.7+s*74.7)*43758.5453;return n-Math.floor(n);};
+const sh=(h,f)=>'rgb('+[1,3,5].map(i=>Math.max(0,Math.min(255,Math.round(parseInt(h.substr(i,2),16)*f))))+')';
+const SHAPES={crystal:[[1,0],[0,1],[1,1],[2,1],[0,2],[1,2],[2,2],[1,3]],lava:[[0,0],[1,0],[0,1],[1,1]],
+  ice:[[1,0],[0,1],[1,1],[2,1],[1,2]],spark:[[2,0],[1,1],[2,1],[1,2],[0,3]],flower:[[1,0],[0,1],[2,1],[1,2]],forest:[[0,1],[1,0],[2,1],[1,1],[1,2]]};
+
+/* ---- PMD SpriteCollab 걷기 애니메이션 (실패하면 기존 정지 이미지로 자동 대체) ---- */
+const SC_BASE="https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/";
+const pmdCache={};
+function getPmd(id){
+  if(pmdCache[id]) return pmdCache[id];
+  const s=pmdCache[id]={ready:false}, dir=SC_BASE+String(id).padStart(4,"0")+"/";
+  fetch(dir+"AnimData.xml").then(r=>r.ok?r.text():Promise.reject()).then(x=>{
+    const a=[...new DOMParser().parseFromString(x,"text/xml").querySelectorAll("Anim")].find(e=>e.querySelector("Name").textContent==="Walk");
+    s.Walk={fw:+a.querySelector("FrameWidth").textContent,fh:+a.querySelector("FrameHeight").textContent,dur:[...a.querySelectorAll("Duration")].map(d=>+d.textContent)};
+    s.img=new Image(); s.img.onload=()=>{s.ready=true;}; s.img.src=dir+"Walk-Anim.png";
+  }).catch(()=>{});
+  return s;
+}
+
+let map=[],explored=[],visible=[],roomId=[],rooms=[],entities=[],items=[],floaters=[],sparks=[];
+let stairs={x:0,y:0}, floorNum=1, activeEnemy=null, mapCv=null;
+
+let player={ x:0,y:0,fx:0,fy:0,t:1,dir:0,anim:0, hp:100,maxHp:100,lv:5,belly:100,berries:2, evoStage:0,quizSolved:0,allies:[] };
+function getPlayerPokeId(){ return curStarter.id+player.evoStage; }
+function getPlayerPokeName(){ return curStarter.names[player.evoStage]; }
+
+/* ---- 액터: 일정 속도 보간 (끊김/감속 없음) ---- */
+let stepMs=135, stepClock=0, carry=0, chaining=false, turnBusy=false;
+const mkActor=o=>Object.assign({dir:0,anim:0,t:1},o,{fx:o.x,fy:o.y});
+function moveActor(a,nx,ny){
+  if(nx===a.x&&ny===a.y) return;
+  a.fx=a.x; a.fy=a.y; a.dir=dirIdx(Math.sign(nx-a.x),Math.sign(ny-a.y));
+  a.x=nx; a.y=ny; a.t=carry/stepMs; if(!chaining) a.anim=0;
+}
+const actorPos=a=>[a.fx+(a.x-a.fx)*a.t, a.fy+(a.y-a.fy)*a.t];
+
+function canStep(x,y,dx,dy){ // 대각선은 모서리 끼임 금지 (PMD 규칙)
+  const nx=x+dx, ny=y+dy;
+  if(!map[ny]||map[ny][nx]===undefined||map[ny][nx]===T_WALL) return false;
+  return !(dx&&dy&&(map[y][nx]===T_WALL||map[ny][x]===T_WALL));
+}
+function bfs(sx,sy){
+  const D=Array.from({length:MH},()=>Array(MW).fill(999)); D[sy][sx]=0; const q=[[sx,sy]];
+  for(let i=0;i<q.length;i++){ const [x,y]=q[i];
+    for(const [dx,dy] of DIRS) if(canStep(x,y,dx,dy)&&D[y+dy][x+dx]===999){ D[y+dy][x+dx]=D[y][x]+1; q.push([x+dx,y+dy]); } }
+  return D;
+}
+const adj=(e,p)=>Math.max(Math.abs(e.x-p.x),Math.abs(e.y-p.y))===1&&canStep(e.x,e.y,p.x-e.x,p.y-e.y);
+
+/* ---- 던전 생성: 4x3 그리드 셀마다 방/교차점 → 신장트리 + 순환 복도 ---- */
+function generateFloor(){
+  const b=getBiome(curUnit.biomeId);
+  const grid=()=>Array.from({length:MH},()=>Array(MW).fill(false));
+  map=Array.from({length:MH},()=>Array(MW).fill(T_WALL));
+  roomId=Array.from({length:MH},()=>Array(MW).fill(-1));
+  explored=grid(); visible=grid(); rooms=[]; entities=[]; items=[]; floaters=[];
+
+  for(let gy=0;gy<GY;gy++) for(let gx=0;gx<GX;gx++){
+    const room=Math.random()<0.8, w=room?5+rnd(4):1, h=room?4+rnd(4):1;
+    const x=room?gx*CW+2+rnd(CW-w-3):gx*CW+3+rnd(CW-6), y=room?gy*CH+2+rnd(CH-h-3):gy*CH+3+rnd(CH-6);
+    const r={x,y,w,h,cx:x+(w>>1),cy:y+(h>>1),junction:!room}; rooms.push(r);
+    for(let yy=y;yy<y+h;yy++) for(let xx=x;xx<x+w;xx++){ map[yy][xx]=room?T_FLOOR:T_CORRIDOR; if(room) roomId[yy][xx]=rooms.length-1; }
+  }
+  if(rooms.filter(r=>!r.junction).length<5) return generateFloor();
+
+  const links=[], seen=new Set([0]), stack=[0];
+  while(stack.length){
+    const i=stack[stack.length-1], gx=i%GX, gy=(i/GX)|0;
+    const nb=[[1,0],[-1,0],[0,1],[0,-1]].map(([a,c])=>[gx+a,gy+c]).filter(([x,y])=>x>=0&&y>=0&&x<GX&&y<GY&&!seen.has(y*GX+x));
+    if(!nb.length){ stack.pop(); continue; }
+    const [x,y]=nb[rnd(nb.length)], j=y*GX+x; seen.add(j); links.push([i,j]); stack.push(j);
+  }
+  for(let k=0;k<4;k++){ const i=rnd(GX*GY); if(Math.random()<.5&&i%GX<GX-1) links.push([i,i+1]); else if(i<GX*(GY-1)) links.push([i,i+GX]); }
+  const H=(y,x1,x2)=>{ for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++) if(map[y][x]===T_WALL) map[y][x]=T_CORRIDOR; };
+  const V=(x,y1,y2)=>{ for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++) if(map[y][x]===T_WALL) map[y][x]=T_CORRIDOR; };
+  links.forEach(([a,c])=>{
+    if(a>c)[a,c]=[c,a]; const A=rooms[a], B=rooms[c];
+    const ax=A.x+rnd(A.w), ay=A.y+rnd(A.h), bx=B.x+rnd(B.w), by=B.y+rnd(B.h);
+    if(a%GX!==c%GX){ const m=(a%GX+1)*CW; H(ay,ax,m); V(m,ay,by); H(by,m,bx); }
+    else { const m=(((a/GX)|0)+1)*CH; V(ax,ay,m); H(m,ax,bx); V(bx,m,by); }
+  });
+
+  const real=rooms.filter(r=>!r.junction), start=real[rnd(real.length)], D0=bfs(start.cx,start.cy);
+  let far=real[0]; real.forEach(r=>{ if(D0[r.cy][r.cx]>D0[far.cy][far.cx]) far=r; });
+  stairs={x:far.cx,y:far.cy};
+
+  Object.assign(player,{x:start.cx,y:start.cy,fx:start.cx,fy:start.cy,t:1,dir:0,anim:0});
+  player.allies.forEach(a=>Object.assign(a,{x:player.x,y:player.y,fx:player.x,fy:player.y,t:1}));
+
+  real.filter(r=>r!==start).sort(()=>Math.random()-.5).slice(0,ENEMIES).forEach(r=>{
+    const ex=r.x+rnd(r.w), ey=r.y+rnd(r.h); if(ex===stairs.x&&ey===stairs.y) return;
+    const pid=b.pokes[rnd(b.pokes.length)], hp=75+floorNum*12;
+    entities.push(mkActor({id:pid,name:getKorNameSync(pid),x:ex,y:ey,hp,maxHp:hp,atk:24,isBoss:false}));
+  });
+  if(floorNum===MAX_FLOOR) entities.push(mkActor({id:b.boss.id,name:b.boss.name,x:stairs.x,y:stairs.y,hp:180,maxHp:180,atk:36,isBoss:true}));
+  real.forEach(r=>{ if(Math.random()<.55){ const ix=r.x+rnd(r.w), iy=r.y+rnd(r.h);
+    if(!(ix===stairs.x&&iy===stairs.y)) items.push({x:ix,y:iy,type:Math.random()<.5?"oran":"apple"}); } });
+  sparks=[]; for(let i=0;i<40;i++){ const r=real[rnd(real.length)]; sparks.push({x:r.x+rnd(r.w),y:r.y+rnd(r.h),ph:Math.random()*6.28,dx:rnd(20)+2,dy:rnd(18)+2}); }
+
+  bakeMap(b); updateVisibility();
+  if(currentStudent){ currentStudent.status=`${curUnit.unitTitle.slice(0,8)}.. B${floorNum}F`; pushStudentToCloud(); }
+  updateHUD();
+  writeLog(floorNum===MAX_FLOOR?`⚠️ <span style="color:var(--gold);">B5F 최심부</span>! 전설의 보스 [${b.boss.name}] 출현!`:`[${b.name}] B${floorNum}F에 도착했다.`,
+    "적을 물리쳐 진화하고 계단을 찾아 내려가자!");
+}
+
+/* ---- 맵 전체를 한 장의 캔버스에 굽기: 벽 정면/윗면 구분, 바닥 입체 그림자, 바이옴 장식 ---- */
+function bakeMap(b){
+  const P=b.pal, sd=SHAPES[b.prop]||SHAPES.ice;
+  mapCv=document.createElement('canvas'); mapCv.width=MW*TS; mapCv.height=MH*TS;
+  const c=mapCv.getContext('2d'), W=(x,y)=>x<0||y<0||x>=MW||y>=MH||map[y][x]===T_WALL;
+  const decor=(x,y,al)=>{ c.globalAlpha=al; c.fillStyle=P.acc; sd.forEach(([i,j])=>c.fillRect(x+i,y+j,1,1)); c.fillStyle="#fff"; c.fillRect(x+sd[0][0],y+sd[0][1],1,1); c.globalAlpha=1; };
+  const grad=(x0,y0,x1,y1,a,rx,ry,rw,rh)=>{ const g=c.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,`rgba(0,0,0,${a})`); g.addColorStop(1,"rgba(0,0,0,0)"); c.fillStyle=g; c.fillRect(rx,ry,rw,rh); };
+  const R=(col,x,y,w,h,a)=>{ c.globalAlpha=a==null?1:a; c.fillStyle=col; c.fillRect(x,y,w,h); c.globalAlpha=1; };
+  const ac=P.acc, g={ice:'ice',crystal:'cry',lava:'lava',forest:'grn',flower:'grn',swamp:'grn',water:'wat',cloud:'wat'}[b.prop]||'dry';
+  const cluster=(ox,oy,sp)=>{ R("#000",ox-4,oy+2,10,2,.22); sp.forEach(([dx,dy,h])=>{ R(sh(ac,.5),ox+dx,oy+dy-h,3,h+1); R(ac,ox+dx+1,oy+dy-h,2,h); R("#fff",ox+dx+1,oy+dy-h,1,2); }); };
+  const fdeco=(X,Y,n)=>{
+    const ox=X+5+Math.floor(n(51)*13), oy=Y+6+Math.floor(n(52)*12), v=Math.floor(n(53)*3);
+    if(g==='ice'){
+      if(v===0) for(let i=0;i<24;i++) R("#eaffff",ox-5+Math.floor(n(60+i)*11),oy-3+Math.floor(n(90+i)*6),1+(i%4===0),1,.5);
+      else if(v===1) cluster(ox,oy,[[0,0,7],[3,2,4],[-3,2,3]]);
+      else { let y=oy; for(let i=0;i<11;i++){ y+=Math.round(n(70+i)*2-1); R("#1c3c64",ox-5+i,y,1,1,.6); R("#fff",ox-5+i,y-1,1,1,.25); } }
+    } else if(g==='cry'){
+      if(v===0) cluster(ox,oy,[[0,0,7],[-3,1,4],[3,1,5]]);
+      else if(v===1) for(let i=0;i<7;i++){ const x=ox-6+Math.floor(n(60+i)*12), y=oy-4+Math.floor(n(80+i)*8); R(ac,x,y,1,1,.8); if(i%3===0) R("#fff",x,y,1,1); }
+      else { let y=oy; for(let i=0;i<10;i++){ y+=Math.round(n(70+i)*2-1); R("#000",ox-5+i,y,1,1,.35); } }
+    } else if(g==='lava'){
+      if(v===0) for(let i=0;i<12;i++){ const x=ox-6+i, y=oy+Math.round(Math.sin(i*1.3+n(1)*6)*2); R("#5a1206",x,y-1,1,3,.8); R(ac,x,y,1,1); if(i%2) R("#ffd060",x,y,1,1); }
+      else if(v===1){ R("#2a0e0a",ox-5,oy-3,11,7,.55); R(ac,ox-3,oy-2,7,4,.9); R("#ffd060",ox-1,oy-1,3,2); }
+      else { R("#000",ox-4,oy-2,9,5,.28); for(let i=0;i<5;i++) R(ac,ox-4+Math.floor(n(60+i)*9),oy-2+Math.floor(n(70+i)*5),1,1,.9); }
+    } else if(g==='grn'){
+      if(v===0) [[-3,4],[0,6],[3,4]].forEach(([dx,h])=>{ R("#3e8c34",ox+dx,oy-h,1,h+1); R("#7ad868",ox+dx+1,oy-h+1,1,h); });
+      else if(v===1){ R("#f0e8d8",ox,oy,2,3); R(ac,ox-2,oy-3,6,3); R("#fff",ox,oy-2,1,1); R("#000",ox-1,oy+3,4,1,.25); }
+      else { [[0,-1],[0,1],[-1,0],[1,0]].forEach(([i,j])=>R(ac,ox+i,oy+j,1,1)); R("#ffe060",ox,oy,1,1); R("#3e8c34",ox,oy+2,1,3); }
+    } else if(g==='wat'){
+      if(v===0) [[5,0],[9,-1],[11,-2],[9,-3],[5,-4]].forEach(([w,dy],i)=>R(sh(ac,.75),ox-(w>>1),oy+dy+2,w,1,.55)),R("#fff",ox-2,oy-1,2,1,.8);
+      else if(v===1){ R(ac,ox-4,oy,9,1,.4); R(ac,ox-2,oy-2,5,1,.4); R(ac,ox-2,oy+2,5,1,.4); }
+      else for(let i=0;i<3;i++) R("#9aa8b0",ox-3+i*3,oy+(i&1),2,2,.7);
+    } else {
+      if(v===0) for(let i=0;i<3;i++){ R("#8a8478",ox-4+i*4,oy+(i&1)*2,2,2,.8); R("#fff",ox-4+i*4,oy+(i&1)*2,1,1,.3); }
+      else if(v===1){ let y=oy; for(let i=0;i<9;i++){ y+=Math.round(n(70+i)*2-1); R("#000",ox-4+i,y,1,1,.35); } }
+      else { R(ac,ox,oy-2,1,5,.6); R(ac,ox-2,oy,5,1,.6); R("#fff",ox,oy,1,1,.8); }
+    }
+  };
+  const wdeco=(X,Y,n)=>{
+    if(g==='ice'){ R("#f4fdff",X,Y,TS,3,.55);
+      for(let k=0;k<5;k++){ if(n(40+k)<.2) continue; const x=X+1+k*5+Math.floor(n(45+k)*3), L=3+Math.floor(n(50+k)*9);
+        for(let j=0;j<L;j++){ const w=Math.max(1,3-Math.floor(j*3/L)); R(j&1?"#bfe8ff":"#eaffff",x+((3-w)>>1),Y+7+j,w,1); } R("#fff",x,Y+7,1,2); } }
+    else if(g==='cry'){ if(n(30)<.5) cluster(X+8+Math.floor(n(31)*8),Y+21,[[0,0,8],[-4,1,5],[4,0,6]]); }
+    else if(g==='lava'){ if(n(30)<.6){ const x=X+4+Math.floor(n(31)*14);
+      for(let j=0;j<11;j++){ const cx=x+Math.round(Math.sin(j*1.1+n(32)*6)*1.5); R("#6a1608",cx-1,Y+9+j,3,1); R(ac,cx,Y+9+j,1,1); if(j%3===0) R("#ffd060",cx,Y+9+j,1,1); } } }
+    else if(g==='grn'){ R("#4a9a3c",X,Y+7,TS,2,.8);
+      for(let k=0;k<3;k++){ if(n(40+k)<.3) continue; const x=X+3+k*8+Math.floor(n(44+k)*4), L=4+Math.floor(n(48+k)*10);
+        for(let j=0;j<L;j++){ R("#2f7a30",x,Y+9+j,1,1); if(j%3===1) R("#7ad868",x+1,Y+9+j,1,1); } } }
+    else if(g==='wat'){ for(let k=0;k<3;k++){ if(n(40+k)<.4) continue; R(sh(ac,.9),X+4+k*8,Y+8,1,10+Math.floor(n(44+k)*8),.35); } }
+    else { if(n(30)<.5) R("#000",X+5+Math.floor(n(31)*12),Y+10,1,6,.35); if(n(33)<.15){ R(ac,X+11,Y+13,2,2,.8); R("#fff",X+11,Y+13,1,1); } }
+  };
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    const X=x*TS, Y=y*TS, n=i=>hash(x,y,i);
+    if(!W(x,y)){
+      const cor=map[y][x]===T_CORRIDOR;
+      c.fillStyle=sh((x+y)&1?P.fA:P.fB,(cor?.84:1)*(.92+hash(x>>1,y>>1,7)*.1+n(1)*.05)); c.fillRect(X,Y,TS,TS);
+      for(let i=0;i<14;i++){ c.fillStyle=n(i+2)<.5?"rgba(255,255,255,.07)":"rgba(0,0,0,.10)"; c.fillRect(X+Math.floor(n(i+20)*22),Y+Math.floor(n(i+40)*22),1+(i&1),1); }
+      c.fillStyle="rgba(255,255,255,.10)"; c.fillRect(X,Y,TS,1); c.fillRect(X,Y,1,TS);
+      c.fillStyle="rgba(0,0,0,.16)"; c.fillRect(X,Y+TS-1,TS,1); c.fillRect(X+TS-1,Y,1,TS);
+      if(W(x,y-1)) grad(0,Y,0,Y+9,.45,X,Y,TS,9);
+      if(W(x-1,y)) grad(X,0,X+5,0,.3,X,Y,5,TS);
+      if(W(x+1,y)) grad(X+TS,0,X+TS-5,0,.3,X+TS-5,Y,5,TS);
+      if(n(9)<(cor?.1:.3)) fdeco(X,Y,n);
+    } else if(!W(x,y+1)){ // 정면이 보이는 절벽
+      c.fillStyle=sh(P.wTop,1.5); c.fillRect(X,Y,TS,7);
+      c.fillStyle=sh(P.wSide,1); c.fillRect(X,Y+7,TS,17);
+      for(let i=0;i<6;i++){ c.fillStyle=n(i+5)<.5?"rgba(0,0,0,.22)":"rgba(255,255,255,.08)"; c.fillRect(X+Math.floor(n(i)*22),Y+8+Math.floor(n(i+9)*12),2,3+Math.floor(n(i+3)*5)); }
+      c.fillStyle="rgba(255,255,255,.28)"; c.fillRect(X,Y+7,TS,1);
+      c.fillStyle="rgba(0,0,0,.45)"; c.fillRect(X,Y+TS-3,TS,3);
+      wdeco(X,Y,n);
+    } else { // 벽 윗면: 방 가까우면 밝게, 깊으면 어둡게
+      let near=false; for(let j=-2;j<=2;j++) for(let i=-2;i<=2;i++) if(!W(x+i,y+j)) near=true;
+      c.fillStyle=sh(P.wTop,near?1:.55); c.fillRect(X,Y,TS,TS);
+      for(let i=0;i<7;i++){ c.fillStyle=n(i)<.5?"rgba(255,255,255,.05)":"rgba(0,0,0,.2)"; c.fillRect(X+Math.floor(n(i+7)*21),Y+Math.floor(n(i+17)*21),3,2); }
+      c.fillStyle="rgba(255,255,255,.18)";
+      if(!W(x,y-1)) c.fillRect(X,Y,TS,2); if(!W(x-1,y)) c.fillRect(X,Y,2,TS); if(!W(x+1,y)) c.fillRect(X+TS-2,Y,2,TS);
+    }
+  }
+  const sx=stairs.x*TS, sy=stairs.y*TS;
+  c.fillStyle="#0b101a"; c.fillRect(sx+2,sy+2,20,20);
+  for(let i=0;i<4;i++){ c.fillStyle=sh("#f8d030",1-i*.18); c.fillRect(sx+4+i*2,sy+4+i*5,16-i*4,4); }
+  c.strokeStyle="#f8d030"; c.strokeRect(sx+2.5,sy+2.5,19,19);
+}
+
+function updateVisibility(){ // 방 안이면 방 전체, 복도면 반경 3
+  visible=Array.from({length:MH},()=>Array(MW).fill(false));
+  const r=roomId[player.y][player.x];
+  if(r>=0){ const R=rooms[r]; for(let y=R.y-1;y<=R.y+R.h;y++) for(let x=R.x-1;x<=R.x+R.w;x++) if(visible[y]) visible[y][x]=true; }
+  for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){ const y=player.y+dy,x=player.x+dx; if(dx*dx+dy*dy<=10&&visible[y]&&x>=0&&x<MW) visible[y][x]=true; }
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++) if(visible[y][x]) explored[y][x]=true;
+}
+
+function startDungeon() {
+  floorNum = 1;
+  player.hp = 100; player.maxHp = 100; player.lv = 5;
+  player.belly = 100; player.berries = 2;
+  player.evoStage = 0; player.quizSolved = 0; player.allies = [];
+  if (currentStudent && !currentStudent.unlockedDex.includes(curStarter.id)) currentStudent.unlockedDex.push(curStarter.id);
+  const b = getBiome(curUnit.biomeId);
+  [0,1,2].forEach(i=>{ getPmd(curStarter.id+i); getPokeImg(curStarter.id+i); });
+  b.pokes.forEach(pid => { getPmd(pid); getPokeImg(pid); fetchKorName(pid); });
+  getPmd(b.boss.id); getPokeImg(b.boss.id);
+  document.getElementById('nav-title').innerText = b.name;
+  showScreen('screen-game');
+  generateFloor();
+}
+
+/* ---- 턴 진행: 이동 시작 → 135ms 동안 모두 같이 걷기 → 도착 처리 ---- */
+const modalOpen=()=>document.getElementById('quiz-overlay').style.display==='flex';
+function stepPlayer(dx,dy){
+  if(modalOpen()||turnBusy||player.hp<=0) return false;
+  stepMs=keys.has("Shift")?80:135;
+  if(dx||dy){
+    player.dir=dirIdx(dx,dy);
+    if(!canStep(player.x,player.y,dx,dy)) return false;
+    const nx=player.x+dx, ny=player.y+dy, hit=entities.find(e=>e.x===nx&&e.y===ny);
+    if(hit){ openBattleModal(hit); return true; }
+    let fx=player.x, fy=player.y; stepClock=carry;
+    moveActor(player,nx,ny);
+    player.allies.forEach(a=>{ const tx=a.x,ty=a.y; moveActor(a,fx,fy); fx=tx; fy=ty; });
+  }
+  stepClock=carry;
+  player.belly=Math.max(0,player.belly-0.4);
+  if(player.belly===0){ player.hp=Math.max(0,player.hp-2); if(checkGameOver()) return true; }
+  turnBusy=true; enemyMoves(); return true;
+}
+function enemyMoves(){
+  const D=bfs(player.x,player.y), taken=new Set([player.x+","+player.y,...player.allies.map(a=>a.x+","+a.y),...entities.map(e=>e.x+","+e.y)]);
+  entities.forEach(e=>{
+    if(e.isBoss||adj(e,player)) return;
+    const bd=D[e.y][e.x]; let best=null, bv=bd;
+    const opts=bd<=10?DIRS:(Math.random()<.3?[DIRS[rnd(8)]]:[]);
+    for(const [dx,dy] of opts){ const nx=e.x+dx, ny=e.y+dy;
+      if(!canStep(e.x,e.y,dx,dy)||taken.has(nx+","+ny)) continue;
+      if(bd<=10){ if(D[ny][nx]<bv){ bv=D[ny][nx]; best=[nx,ny]; } } else best=[nx,ny]; }
+    if(best){ taken.delete(e.x+","+e.y); moveActor(e,best[0],best[1]); taken.add(best[0]+","+best[1]); }
+  });
+}
+function endStep(){
+  const i=items.findIndex(it=>it.x===player.x&&it.y===player.y);
+  if(i!==-1){ const it=items.splice(i,1)[0];
+    if(it.type==="oran"){ player.berries++; addFloater("오랭열매 획득!",player.x,player.y,"#5890f0"); }
+    else { player.belly=Math.min(100,player.belly+45); addFloater("배고픔 +45%",player.x,player.y,"#68c850"); } }
+  if(player.x===stairs.x&&player.y===stairs.y){
+    if(floorNum<MAX_FLOOR){ floorNum++; addFloater(`B${floorNum}F 이동!`,player.x,player.y,"#f8d030"); generateFloor(); return; }
+    if(currentStudent){
+      if(!currentStudent.clearedUnits.includes(curUnit.unitId)) currentStudent.clearedUnits.push(curUnit.unitId);
+      currentStudent.status="단원 클리어 완료!"; pushStudentToCloud();
+    }
+    alert(`🎉 축하합니다! [${curUnit.unitTitle}] 5층 보스전을 완벽히 돌파했습니다!`);
+    renderLobby(); showScreen('screen-lobby'); return;
+  }
+  updateVisibility(); updateHUD();
+  const foe=entities.find(e=>adj(e,player)); if(foe) openBattleModal(foe);
+}
+
+/* ---- 입력: 키 누르고 있으면 끊김 없이 연속 이동, 8방향, Shift=달리기 ---- */
+const keys=new Set(); let padDir=null, queued=null, queuedAt=0;
+const KEYMAP={ArrowUp:[0,-1],w:[0,-1],ArrowDown:[0,1],s:[0,1],ArrowLeft:[-1,0],a:[-1,0],ArrowRight:[1,0],d:[1,0],q:[-1,-1],e:[1,-1],z:[-1,1],c:[1,1]};
+function readInput(){
+  if(padDir){ queued=null; return padDir; }
+  let dx=0,dy=0; keys.forEach(k=>{ const v=KEYMAP[k]; if(v){ dx+=v[0]; dy+=v[1]; } });
+  dx=Math.sign(dx); dy=Math.sign(dy);
+  if(dx||dy||keys.has(" ")){ queued=null; return [dx,dy]; }
+  if(queued&&performance.now()-queuedAt<250){ const q=queued; queued=null; return q; }
+  queued=null; return null;
+}
+const gameActive=()=>document.getElementById('screen-game').classList.contains('active');
+const keyName=e=>e.key.length===1?e.key.toLowerCase():e.key;
+window.addEventListener('keydown',e=>{
+  if(document.getElementById('pw-modal').style.display==='flex'&&e.key==='Enter'){ verifyTeacherPw(); return; }
+  if(!gameActive()) return;
+  const k=keyName(e);
+  if(KEYMAP[k]||k===" "||k==="Shift"){ e.preventDefault(); keys.add(k); if(KEYMAP[k]){ queued=KEYMAP[k]; queuedAt=performance.now(); } }
+});
+window.addEventListener('keyup',e=>keys.delete(keyName(e)));
+window.addEventListener('blur',()=>keys.clear());
+document.querySelectorAll('#dpad .d-btn').forEach(b=>{
+  const [dx,dy]=b.dataset.d.split(',').map(Number);
+  b.addEventListener('pointerdown',e=>{ e.preventDefault(); padDir=[dx,dy]; queued=[dx,dy]; queuedAt=performance.now(); });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>{ if(padDir&&padDir[0]===dx&&padDir[1]===dy) padDir=null; }));
+});
+
+function useOranBerry() {
+  if (player.berries <= 0) { writeLog("오랭열매가 없습니다!", ""); return; }
+  player.berries--;
+  player.hp = Math.min(player.maxHp, player.hp + 55);
+  addFloater("+55 HP", player.x, player.y, "#48e058");
+  updateHUD();
+}
+
+function abortDungeon() {
+  if (currentStudent) { currentStudent.status = "로비 대기중"; pushStudentToCloud(); }
+  renderLobby();
+  showScreen('screen-lobby');
+}
+
+function checkGameOver() {
+  if (player.hp <= 0) {
+    document.getElementById('quiz-overlay').style.display = 'none';
+    if (currentStudent) { currentStudent.status = "공략 실패(복습중)"; pushStudentToCloud(); }
+    setTimeout(() => {
+      alert("💥 체력이 모두 소진되어 던전 공략에 실패했습니다!\n개념을 복습하고 다시 도전해 보세요!");
+      renderLobby();
+      showScreen('screen-lobby');
+    }, 200);
+    return true;
+  }
+  return false;
+}
+
+/* =========================================================================
+ * 6. 퀴즈 배틀 & 스타팅 3단계 진화 로직 & 동료 포섭 (일반 45%, 보스 35%)
+ * ========================================================================= */
+function openBattleModal(enemy) {
+  activeEnemy = enemy;
+  activeEnemy.name = getKorNameSync(enemy.id, enemy.name);
+  document.getElementById('quiz-overlay').style.display = 'flex';
+  document.getElementById('boss-banner').style.display = enemy.isBoss ? 'block' : 'none';
+  refreshBattleHUD();
+  nextQuiz();
+}
+
+function refreshBattleHUD() {
+  const b = getBiome(curUnit.biomeId);
+  document.getElementById('b-p-img').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${getPlayerPokeId()}.png`;
+  document.getElementById('b-p-name').innerText = `${getPlayerPokeName()} (Lv.${player.lv})`;
+  document.getElementById('b-p-hp-txt').innerText = `HP ${player.hp}/${player.maxHp}`;
+  document.getElementById('b-p-hp-fill').style.width = `${(player.hp / player.maxHp) * 100}%`;
+
+  document.getElementById('b-e-img').src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${activeEnemy.id}.png`;
+  document.getElementById('b-e-name').innerText = (activeEnemy.isBoss ? "👑 " : "") + activeEnemy.name;
+  document.getElementById('b-e-hp-txt').innerText = `HP ${activeEnemy.hp}/${activeEnemy.maxHp}`;
+  document.getElementById('b-e-hp-fill').style.width = `${(activeEnemy.hp / activeEnemy.maxHp) * 100}%`;
+
+  const isAdv = curStarter.type === b.rec;
+  const adv = document.getElementById('b-adv');
+  adv.innerText = isAdv ? "★ 상성 유리 (1.5배)" : "상성 보통";
+  adv.style.background = isAdv ? "#f8d030" : "#5890f0";
+}
+
+function nextQuiz() {
+  const qs = curUnit.questions;
+  const qItem = qs[Math.floor(Math.random() * qs.length)];
+  document.getElementById('q-text').innerText = `Q. ${qItem.q}`;
+
+  const wrap = document.getElementById('q-options');
+  wrap.innerHTML = "";
+  [...qItem.options].sort(() => Math.random() - 0.5).forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = "opt-btn";
+    btn.innerText = opt;
+    btn.onclick = () => resolveQuiz(opt, qItem.a);
+    wrap.appendChild(btn);
+  });
+}
+
+function resolveQuiz(selected, correct) {
+  if (currentStudent) currentStudent.total++;
+  const b = getBiome(curUnit.biomeId);
+  const isAdv = curStarter.type === b.rec;
+  const sk = SKILLS[curStarter.type] || SKILLS.water;
+
+  if (selected === correct) {
+    if (currentStudent) currentStudent.correct++;
+    player.quizSolved++;
+    player.lv++;
+
+    // 진화 단계만큼 보너스 데미지 증가
+    const baseDmg = isAdv ? 90 : 65;
+    const dmg = baseDmg + (player.evoStage * 20);
+    activeEnemy.hp = Math.max(0, activeEnemy.hp - dmg);
+    refreshBattleHUD();
+
+    // 3단계 진화 체크 (3문제 정답 -> 1차 진화, 6문제 정답 -> 최종 진화)
+    let evoAlert = "";
+    if ((player.quizSolved === 3 && player.evoStage === 0) || (player.quizSolved === 6 && player.evoStage === 1)) {
+      const oldName = getPlayerPokeName();
+      player.evoStage++;
+      const newName = getPlayerPokeName();
+      const newId = getPlayerPokeId();
+      player.maxHp += 30;
+      player.hp = player.maxHp;
+      if (currentStudent && !currentStudent.unlockedDex.includes(newId)) {
+        currentStudent.unlockedDex.push(newId);
+      }
+      evoAlert = `\n\n✨ 오오옷?! [${oldName}]의 상태가...!\n축하합니다! [${newName}](으)로 진화했습니다! (HP 완전 회복 & 공격력 대폭 상승!)`;
+      addFloater(`✨${newName} 진화!!`, player.x, player.y, "#00ffff");
+    }
+
+    if (activeEnemy.hp <= 0) {
+      document.getElementById('quiz-overlay').style.display = 'none';
+      entities = entities.filter(e => e !== activeEnemy);
+      addFloater(`-${dmg} 격파!`, activeEnemy.x, activeEnemy.y, "#f8d030");
+
+      // 동료 포섭 확률 (보스 35%, 일반 45%)
+      const chance = activeEnemy.isBoss ? 0.35 : 0.45;
+      let recMsg = `${activeEnemy.name}을(를) 물리쳤다!`;
+      if (Math.random() < chance) {
+        if (currentStudent && !currentStudent.unlockedDex.includes(activeEnemy.id)) {
+          currentStudent.unlockedDex.push(activeEnemy.id);
+        }
+        if (player.allies.length < 3) {
+          player.allies.push(mkActor({ id:activeEnemy.id, name:activeEnemy.name, x:player.x, y:player.y }));
+        }
+        recMsg = ` 동료 합류! [${activeEnemy.name}]이(가) 도감에 등록되었습니다!`;
+        addFloater("동료 합류!!", player.x, player.y, "#68ff88");
+      }
+
+      if (evoAlert) alert(`정답! [${isAdv ? sk.super : sk.normal}] 적중!` + evoAlert);
+      pushStudentToCloud();
+      writeLog(`정답! [${isAdv ? sk.super : sk.normal}] 발동!`, recMsg);
+      updateHUD();
+    } else {
+      if (evoAlert) alert(evoAlert);
+      refreshBattleHUD();
+      writeLog(`정답! ${dmg} 데미지!`, `보스의 남은 체력: ${activeEnemy.hp}. 연속 문제로 마무리하세요!`);
+      nextQuiz();
+    }
+  } else {
+    const eDmg = activeEnemy.atk || 26;
+    player.hp = Math.max(0, player.hp - eDmg);
+    refreshBattleHUD();
+    updateHUD();
+    pushStudentToCloud();
+    if (checkGameOver()) return;
+    alert(`❌ 오답! (정답: ${correct})\n${activeEnemy.name}의 반격으로 체력이 ${eDmg} 감소했습니다!`);
+    nextQuiz();
+  }
+}
+
+/* =========================================================================
+ * 7. 렌더러: 일정 속도 이동 · PMD 8방향 걷기 애니메이션 · 픽셀 퍼펙트 카메라
+ * ========================================================================= */
+const canvas=document.getElementById('dungeonCanvas'), ctx=canvas.getContext('2d');
+const miniCanvas=document.getElementById('minimapCanvas'), miniCtx=miniCanvas.getContext('2d');
+let S=2, VW=300, VH=300, lastSz="";
+
+function addFloater(text,tx,ty,color){ floaters.push({text,x:tx*TS+TS/2,y:ty*TS,color,alpha:1}); }
+function writeLog(l1, l2) {
+  document.getElementById('log-1').innerHTML = l1;
+  document.getElementById('log-2').innerHTML = l2 || "";
+}
+
+function updateHUD() {
+  document.getElementById('hud-floor').innerText = `B${floorNum}F/5F`;
+  document.getElementById('hud-name').innerText = getPlayerPokeName();
+  document.getElementById('hud-lv').innerText = `Lv.${player.lv} (동료${player.allies.length})`;
+  document.getElementById('hud-belly').innerText = Math.floor(player.belly);
+  document.getElementById('hud-hp').innerText = `${player.hp}/${player.maxHp}`;
+  document.getElementById('hud-hp-fill').style.width = `${(player.hp / player.maxHp) * 100}%`;
+  document.getElementById('berry-cnt').innerText = player.berries;
+
+  const evoEl = document.getElementById('hud-evo-prog');
+  if (player.evoStage === 0) evoEl.innerText = `1차 진화까지 정답 ${Math.max(0, 3 - player.quizSolved)}회`;
+  else if (player.evoStage === 1) evoEl.innerText = `최종 진화까지 정답 ${Math.max(0, 6 - player.quizSolved)}회`;
+  else evoEl.innerText = `★ 최종 진화 완료! (${getPlayerPokeName()})`;
+}
+
+
+function resizeCanvas(){
+  const v=document.getElementById('viewport'), dpr=window.devicePixelRatio||1, w=v.clientWidth, h=v.clientHeight;
+  if(!w||!h||lastSz===w+"x"+h+"x"+dpr) return; lastSz=w+"x"+h+"x"+dpr;
+  S=Math.max(1,Math.round(Math.max(2,Math.floor(Math.min(w,h)/216))*dpr));
+  canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr); VW=canvas.width/S; VH=canvas.height/S;
+}
+function update(dt){
+  [player,...player.allies,...entities].forEach(a=>{ if(a.t<1){ a.t=Math.min(1,a.t+dt/stepMs); a.anim+=dt; } });
+  if(turnBusy){ stepClock+=dt; if(stepClock>=stepMs){ carry=Math.min(stepClock-stepMs,stepMs); turnBusy=false; chaining=true; endStep(); } }
+  if(!turnBusy&&!modalOpen()&&player.hp>0){ const d=readInput(); if(d) stepPlayer(d[0],d[1]); }
+  carry=0; chaining=false;
+}
+let lastT=0;
+function renderLoop(time){
+  const dt=Math.min(50,time-lastT||16); lastT=time;
+  if(gameActive()&&map.length&&mapCv){ resizeCanvas(); update(dt); drawDungeon(time); drawMinimap(); }
+  requestAnimationFrame(renderLoop);
+}
+
+function drawPoke(id,cx,cy,dir,anim,moving,sc){
+  const s=getPmd(id);
+  if(s.ready){
+    const w=s.Walk, tot=w.dur.reduce((a,b)=>a+b,0); let f=0;
+    if(moving){ let t=((anim/(stepMs*2))%1)*tot; while(f<w.dur.length-1&&t>=w.dur[f]){ t-=w.dur[f]; f++; } }
+    const dw=w.fw*sc, dh=w.fh*sc;
+    ctx.drawImage(s.img,f*w.fw,dir*w.fh,w.fw,w.fh,Math.round(cx-dw/2),Math.round(cy-dh/2-3),dw,dh);
+  } else {
+    const im=getPokeImg(id); if(!im.complete||!im.naturalWidth) return;
+    const z=34*sc, bob=moving?-Math.abs(Math.sin(anim/90))*3:0;
+    ctx.save(); ctx.translate(cx,cy-3); if(DIRS[dir][0]<0) ctx.scale(-1,1); ctx.drawImage(im,-z/2,-z/2-4+bob,z,z); ctx.restore();
+  }
+}
+
+function drawDungeon(time){
+  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle="#05070c"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(S,0,0,S,0,0); ctx.imageSmoothingEnabled=false;
+  const [ppx,ppy]=actorPos(player);
+  const camX=Math.round(ppx*TS+TS/2-VW/2), camY=Math.round(ppy*TS+TS/2-VH/2);
+  ctx.translate(-camX,-camY);
+  const x0=Math.max(0,Math.floor(camX/TS)), x1=Math.min(MW-1,Math.floor((camX+VW)/TS));
+  const y0=Math.max(0,Math.floor(camY/TS)), y1=Math.min(MH-1,Math.floor((camY+VH)/TS));
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
+    if(!explored[y][x]) continue;
+    ctx.drawImage(mapCv,x*TS,y*TS,TS,TS,x*TS,y*TS,TS,TS);
+    if(!visible[y][x]){ ctx.fillStyle="rgba(4,8,18,.58)"; ctx.fillRect(x*TS,y*TS,TS,TS); }
+  }
+  const acc=getBiome(curUnit.biomeId).pal.acc;
+  sparks.forEach(sp=>{ if(!visible[sp.y][sp.x]) return;
+    const a=Math.max(0,Math.sin(time/350+sp.ph)); if(a<.15) return;
+    const X=sp.x*TS+sp.dx, Y=sp.y*TS+sp.dy; ctx.globalAlpha=a; ctx.fillStyle=acc;
+    ctx.fillRect(X,Y,1,1); if(a>.7){ ctx.fillRect(X-1,Y,1,1); ctx.fillRect(X+1,Y,1,1); ctx.fillRect(X,Y-1,1,1); ctx.fillRect(X,Y+1,1,1); }
+    ctx.globalAlpha=1; });
+  items.forEach(it=>{ if(!visible[it.y][it.x]) return;
+    const cx=it.x*TS+12, cy=it.y*TS+13+Math.sin(time/300+it.x)*1;
+    ctx.fillStyle="rgba(0,0,0,.4)"; ctx.beginPath(); ctx.ellipse(cx,it.y*TS+19,4,2,0,0,6.3); ctx.fill();
+    ctx.fillStyle=it.type==="oran"?"#4898f8":"#f04848"; ctx.beginPath(); ctx.arc(cx,cy,4,0,6.3); ctx.fill();
+    ctx.fillStyle="#68e858"; ctx.fillRect(cx-1,cy-6,2,2); });
+
+  const list=[{a:player,id:getPlayerPokeId(),ring:"#58c8ff",sc:1}];
+  player.allies.forEach(a=>list.push({a,id:a.id,ring:"#58f878",sc:1}));
+  entities.forEach(e=>{ if(visible[e.y][e.x]) list.push({a:e,id:e.id,ring:e.isBoss?"#f8d030":"#ff4848",sc:e.isBoss?1.5:1}); });
+  list.sort((p,q)=>actorPos(p.a)[1]-actorPos(q.a)[1]);
+  list.forEach(({a,id,ring,sc})=>{
+    const [ax,ay]=actorPos(a), cx=ax*TS+TS/2, cy=ay*TS+TS/2, rx=7*sc;
+    ctx.fillStyle="rgba(0,0,0,.4)"; ctx.beginPath(); ctx.ellipse(cx,cy+7,rx,rx*.45,0,0,6.3); ctx.fill();
+    ctx.strokeStyle=ring; ctx.lineWidth=1; ctx.stroke();
+    drawPoke(id,cx,cy,a.dir,a.anim,a.t<1,sc);
+  });
+
+  ctx.setTransform(1,0,0,1,0,0); ctx.font=`900 ${Math.round(6.5*S)}px Pretendard`; ctx.textAlign="center";
+  for(let i=floaters.length-1;i>=0;i--){ const f=floaters[i];
+    const X=(f.x-camX)*S, Y=(f.y-camY)*S; ctx.globalAlpha=Math.max(0,f.alpha);
+    ctx.lineWidth=3; ctx.strokeStyle="#000"; ctx.strokeText(f.text,X,Y); ctx.fillStyle=f.color; ctx.fillText(f.text,X,Y);
+    f.y-=.4; f.alpha-=.015; if(f.alpha<=0) floaters.splice(i,1); }
+  ctx.globalAlpha=1; ctx.textAlign="start";
+}
+
+function drawMinimap(){
+  miniCtx.clearRect(0,0,104,104); const sc=2, ox=4, oy=16;
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++) if(explored[y][x]&&map[y][x]!==T_WALL){
+    miniCtx.fillStyle=visible[y][x]?"rgba(120,190,255,.7)":"rgba(100,175,250,.38)"; miniCtx.fillRect(ox+x*sc,oy+y*sc,sc,sc); }
+  if(explored[stairs.y][stairs.x]){ miniCtx.fillStyle="#00ffff"; miniCtx.fillRect(ox+stairs.x*sc-1,oy+stairs.y*sc-1,4,4); }
+  entities.forEach(e=>{ if(visible[e.y][e.x]){ miniCtx.fillStyle=e.isBoss?"#ff00ff":"#ff4444"; miniCtx.fillRect(ox+e.x*sc,oy+e.y*sc,sc,sc); } });
+  miniCtx.fillStyle="#f8d030"; miniCtx.fillRect(ox+player.x*sc-1,oy+player.y*sc-1,4,4);
+}
+
+/* =========================================================================
+ * 8. 교사 비밀번호 보안 모달(* 마스킹) & 관리자 대시보드
+ * ========================================================================= */
+function openPwModal() {
+  const inp = document.getElementById('teacher-pw-input');
+  inp.value = "";
+  document.getElementById('pw-modal').style.display = 'flex';
+  setTimeout(() => inp.focus(), 50);
+}
+function closePwModal() {
+  document.getElementById('pw-modal').style.display = 'none';
+}
+async function verifyTeacherPw() {
+  const val = document.getElementById('teacher-pw-input').value;
+  let ok = false;
+  if (useCloud()) {
+    try { await authCall("signInWithPassword", CONFIG.TEACHER_EMAIL, val); ok = true; }
+    catch (e) { if (/TOO_MANY/.test(e.message)) { alert("시도가 너무 많습니다. 잠시 후 다시 시도해 주세요."); return; } }
+  } else ok = (val === teacherPw);
+  if (!ok) { alert("비밀번호가 일치하지 않습니다!"); return; }
+  closePwModal(); await syncFromCloud(); initTeacherScreen(); showScreen('screen-teacher');
+}
+function closeTeacherScreen() { // 교사 모드를 닫으면 로그아웃 (학생 세션과 섞이지 않게)
+  auth = null; currentStudent = null;
+  document.getElementById('btn-dex').style.display = 'none';
+  showScreen('screen-login');
+}
+
+function setTeacherTab(tab) {
+  document.getElementById('t-tab-progress').style.display = tab === 'progress' ? 'block' : 'none';
+  document.getElementById('t-tab-edit').style.display = tab === 'edit' ? 'block' : 'none';
+  document.getElementById('t-tab-cloud').style.display = tab === 'cloud' ? 'block' : 'none';
+  if (tab === 'progress') loadProgress();
+}
+
+function initTeacherScreen() {
+  const cs = document.getElementById('t-class-sel');
+  if (!cs.options.length) {
+    cs.add(new Option("전체 학생", ""));
+    for (let g = 1; g <= 3; g++) for (let c = 1; c <= 11; c++) cs.add(new Option(`${g}학년 ${c}반`, `${g}${String(c).padStart(2, "0")}`));
+  }
+  document.getElementById('cloud-status').innerText = useCloud() ? "✅ Firebase 연결 설정됨: " + firebaseURL : "⚠️ Firebase 주소가 비어 있어 이 기기에만 저장됩니다.";
+  const bSel = document.getElementById('t-biome-sel');
+  bSel.innerHTML = "";
+  BIOMES.forEach(b => {
+    const o = document.createElement('option');
+    o.value = b.id; o.innerText = `${b.name} (보스: ${b.boss.name})`;
+    bSel.appendChild(o);
+  });
+  refreshUnitDropdown(0);
+  loadProgress();
+}
+
+let progressRows = [];
+const classPrefix = () => { const e = document.getElementById('t-class-sel'); return e ? e.value : ""; };
+async function loadProgress() {
+  const pre = classPrefix();
+  try {
+    let rows;
+    if (useCloud()) {
+      const q = pre ? `?orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent('"' + pre + '00"')}&endAt=${encodeURIComponent('"' + pre + '99"')}` : "";
+      rows = Object.values(await fb("/summary.json" + q) || {});
+      document.getElementById('sync-indicator').className = "sync-dot online";
+    } else rows = Object.values(studentsDB).map(summaryOf).filter(r => String(r.id).startsWith(pre));
+    progressRows = rows; renderProgressTable();
+  } catch (e) { document.getElementById('sync-indicator').className = "sync-dot"; }
+}
+function renderProgressTable() {
+  const tb = document.getElementById('t-progress-tbody');
+  tb.innerHTML = "";
+  const arr = [...progressRows].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  if (!arr.length) { tb.innerHTML = `<tr><td colspan="7">학생 기록이 없습니다.</td></tr>`; return; }
+  arr.forEach(s => {
+    const acc = s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0, id = esc(s.id);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${id}</b></td><td>${esc(s.name)}</td>
+      <td style="color:#68e868;">${esc(s.status || '대기')}</td>
+      <td>${s.cleared || 0}/${unitsData.length}</td>
+      <td>${acc}% (${s.correct || 0}/${s.total || 0})</td>
+      <td>${s.dex || 0}종</td>
+      <td><button class="btn btn-gray" style="padding:2px 5px; font-size:9px;" onclick="resetStudentPw('${id}')">비번초기화</button>
+          <button class="btn btn-red" style="padding:2px 5px; font-size:9px; margin-top:2px;" onclick="deleteStudent('${id}')">삭제</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+const nextGen = async id => String(+((await fb("/gen/" + id + ".json")) || "0") + 1);
+async function deleteStudent(id) {
+  if (!confirm(`[${id}] 계정을 삭제할까요?\n진도·도감 기록이 모두 사라지며 되돌릴 수 없습니다.\n(같은 학번으로 새로 시작할 수 있습니다)`)) return;
+  try {
+    if (useCloud()) await fb(".json", "PATCH", { ["students/" + id]: null, ["summary/" + id]: null, ["gen/" + id]: await nextGen(id) });
+    delete studentsDB[id]; saveLocalDB();
+  } catch (e) { alert("삭제에 실패했습니다. 인터넷 연결을 확인해 주세요."); return; }
+  loadProgress();
+}
+async function resetStudentPw(id) {
+  if (!confirm(`[${id}] 비밀번호를 초기화할까요?\n진도·도감은 그대로 두고, 학생이 다음에 로그인할 때 입력한 값이 새 비밀번호가 됩니다.`)) return;
+  try {
+    if (useCloud()) await fb("/gen/" + id + ".json", "PUT", await nextGen(id)); // 계정 세대를 올려 옛 비밀번호 무효화
+    else if (studentsDB[id]) { delete studentsDB[id].pwh; saveLocalDB(); }
+    alert("초기화되었습니다. 학생에게 새 비밀번호로 다시 로그인하라고 안내해 주세요.");
+  } catch (e) { alert("초기화에 실패했습니다. 인터넷 연결을 확인해 주세요."); }
+}
+
+function exportStudentCSV() {
+  let csv = "\uFEFF학번,이름,현재상태,클리어단원수,정답수,시도수,도감수집수\n";
+  [...progressRows].sort((a, b) => String(a.id).localeCompare(String(b.id))).forEach(s => {
+    csv += `${s.id},"${String(s.name).replace(/"/g, '""')}",${s.status || ''},${s.cleared || 0},${s.correct || 0},${s.total || 0},${s.dex || 0}\n`;
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+  a.download = "학생_진도율_현황.csv"; a.click();
+}
+
+function refreshUnitDropdown(idx = 0) {
+  const uSel = document.getElementById('t-unit-sel');
+  uSel.innerHTML = "";
+  unitsData.forEach((u, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.innerText = u.unitTitle;
+    uSel.appendChild(o);
+  });
+  uSel.selectedIndex = idx;
+  loadUnitToUI();
+}
+
+function loadUnitToUI() {
+  const u = unitsData[document.getElementById('t-unit-sel').value];
+  if (!u) return;
+  document.getElementById('t-unit-title').value = u.unitTitle;
+  document.getElementById('t-biome-sel').value = u.biomeId;
+  const list = document.getElementById('t-q-list');
+  list.innerHTML = "";
+  u.questions.forEach(q => addQRow(q.q, q.options));
+}
+
+function addQRow(qTxt = "", opts = ["","","",""]) {
+  const list = document.getElementById('t-q-list');
+  const d = document.createElement('div');
+  d.className = "q-row";
+  d.innerHTML = `
+    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+      <span style="font-size:10px; color:var(--gold); font-weight:bold;">문항 질문</span>
+      <button class="btn btn-red" style="padding:2px 6px; font-size:9px;" onclick="this.parentElement.parentElement.remove()">삭제</button>
+    </div>
+    <input type="text" class="input-field q-in" value="${qTxt}" placeholder="질문 입력" style="margin-bottom:5px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
+      <input type="text" class="input-field o0" value="${opts[0]||''}" placeholder="정답 보기" style="border-color:#48e058; margin:0;">
+      <input type="text" class="input-field o1" value="${opts[1]||''}" placeholder="오답 2" style="margin:0;">
+      <input type="text" class="input-field o2" value="${opts[2]||''}" placeholder="오답 3" style="margin:0;">
+      <input type="text" class="input-field o3" value="${opts[3]||''}" placeholder="오답 4" style="margin:0;">
+    </div>
+  `;
+  list.appendChild(d);
+}
+
+function addNewUnit() {
+  unitsData.push({
+    unitId: "u_" + Date.now(),
+    unitTitle: `${unitsData.length + 1}단원: 새 단원`,
+    biomeId: BIOMES[unitsData.length % BIOMES.length].id,
+    questions: [{ q:"새 질문을 입력하세요.", a:"정답", options:["정답","오답1","오답2","오답3"] }]
+  });
+  refreshUnitDropdown(unitsData.length - 1);
+}
+
+async function deleteUnit() {
+  if (unitsData.length <= 1) { alert("최소 1개 단원은 유지해야 합니다."); return; }
+  const idx = document.getElementById('t-unit-sel').value;
+  if (confirm("이 단원을 삭제하시겠습니까?")) {
+    unitsData.splice(idx, 1);
+    await pushUnitsToCloud();
+    curUnit = unitsData[0];
+    refreshUnitDropdown(0);
+  }
+}
+
+async function saveUnitUI() {
+  const idx = document.getElementById('t-unit-sel').value;
+  const u = unitsData[idx];
+  u.unitTitle = document.getElementById('t-unit-title').value.trim() || "단원";
+  u.biomeId = document.getElementById('t-biome-sel').value;
+
+  const qs = [];
+  document.querySelectorAll('#t-q-list .q-row').forEach(r => {
+    const q = r.querySelector('.q-in').value.trim();
+    const o0 = r.querySelector('.o0').value.trim();
+    const o1 = r.querySelector('.o1').value.trim() || "오답A";
+    const o2 = r.querySelector('.o2').value.trim() || "오답B";
+    const o3 = r.querySelector('.o3').value.trim() || "오답C";
+    if (q && o0) qs.push({ q, a:o0, options:[o0, o1, o2, o3] });
+  });
+  if (qs.length === 0) { alert("최소 1문항 이상 입력해 주세요."); return; }
+  u.questions = qs;
+  await pushUnitsToCloud();
+  alert("단원 설정이 저장되고 클라우드에 실시간 배포되었습니다!");
+}
+
+async function saveFirebaseConfig() {
+  firebaseURL = document.getElementById('fb-url-input').value.trim();
+  localStorage.setItem("PMD_FIREBASE_URL", firebaseURL);
+  await pushUnitsToCloud();
+  await syncFromCloud();
+  alert("파이어베이스 실시간 연동 설정이 완료되었습니다!");
+}
+
+function changeTeacherPw() {
+  const np = document.getElementById('new-teacher-pw').value.trim();
+  if (!np) { alert("새 비밀번호를 입력해 주세요."); return; }
+  teacherPw = np;
+  localStorage.setItem("PMD_TEACHER_PW", teacherPw);
+  alert("교사 비밀번호가 변경되었습니다!");
+}
+
+syncFromCloud();
+requestAnimationFrame(renderLoop);
+</script>
+</body>
+</html>
